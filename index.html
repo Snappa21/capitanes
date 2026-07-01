@@ -1,0 +1,1377 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#002856">
+  <title>Capitan Control</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --navy: #002856;
+      --navy-2: #001b3d;
+      --blue: #0757b7;
+      --blue-soft: #eaf3ff;
+      --gold: #d9a441;
+      --green: #138a52;
+      --purple: #6f42c1;
+      --ink: #101828;
+      --muted: #667085;
+      --line: #e4e7ec;
+      --panel: #ffffff;
+      --bg: #f6f8fb;
+      --danger: #b42318;
+      --shadow: 0 12px 32px rgba(16, 24, 40, .08);
+      --radius: 8px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { background: var(--bg); color: var(--ink); }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+    .app { min-height: 100vh; display: grid; grid-template-columns: 250px 1fr; }
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 24px 18px;
+      color: #fff;
+      background: linear-gradient(180deg, var(--navy), var(--navy-2));
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; padding: 0 6px; }
+    .brand-mark {
+      width: 46px; height: 46px; border: 2px solid rgba(255,255,255,.9);
+      border-radius: 50%; display: grid; place-items: center; font-size: 26px; font-weight: 800;
+    }
+    .brand-title { font-size: 18px; font-weight: 800; line-height: 1.05; text-transform: uppercase; }
+    .brand-sub { font-size: 10px; color: rgba(255,255,255,.7); margin-top: 3px; }
+    .nav { display: grid; gap: 6px; }
+    .nav button {
+      height: 46px;
+      border: 0;
+      border-radius: var(--radius);
+      color: rgba(255,255,255,.85);
+      background: transparent;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 12px;
+      text-align: left;
+    }
+    .nav button svg, .icon svg { width: 18px; height: 18px; stroke-width: 2; }
+    .nav button.active { background: var(--blue); color: #fff; box-shadow: 0 8px 24px rgba(7,87,183,.35); }
+    .side-foot {
+      margin-top: auto;
+      display: grid;
+      gap: 10px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255,255,255,.12);
+      color: rgba(255,255,255,.85);
+    }
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      width: fit-content; min-height: 30px; padding: 6px 10px;
+      border-radius: 999px; background: rgba(255,255,255,.1); font-size: 12px;
+    }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); }
+    .dot.off { background: var(--gold); }
+    .main { min-width: 0; padding: 30px 28px 92px; }
+    .topbar { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 24px; }
+    h1 { margin: 0 0 8px; font-size: 28px; line-height: 1.12; }
+    h2 { margin: 0 0 6px; font-size: 19px; }
+    h3 { margin: 0; font-size: 16px; }
+    p { margin: 0; color: var(--muted); }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+    .btn, .chip, .input, select, textarea {
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      color: var(--ink);
+    }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 0 14px;
+      font-weight: 700;
+    }
+    .btn.primary { background: var(--navy); color: #fff; border-color: var(--navy); }
+    .btn.blue { background: var(--blue); color: #fff; border-color: var(--blue); }
+    .btn.ghost { background: transparent; }
+    .btn.danger { color: var(--danger); border-color: #f4c7c3; background: #fff7f6; }
+    .btn.icon-only { width: 42px; padding: 0; }
+    .grid { display: grid; gap: 18px; }
+    .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 22px; }
+    .stat, .panel, .quick {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .stat { padding: 20px; display: grid; gap: 12px; min-height: 140px; }
+    .stat-head { display: flex; align-items: center; gap: 12px; color: var(--muted); }
+    .bubble { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; }
+    .bubble.blue { color: var(--blue); background: var(--blue-soft); }
+    .bubble.green { color: var(--green); background: #eaf8f0; }
+    .bubble.gold { color: #a66b00; background: #fff4dc; }
+    .bubble.purple { color: var(--purple); background: #f3eaff; }
+    .stat strong { font-size: 26px; color: var(--navy); }
+    .content-grid { grid-template-columns: minmax(310px, .88fr) minmax(360px, 1.12fr); align-items: start; }
+    .panel { padding: 20px; min-width: 0; }
+    .form { display: grid; gap: 14px; margin-top: 18px; }
+    .field { display: grid; gap: 7px; min-width: 0; }
+    label { font-size: 13px; font-weight: 750; color: #182230; }
+    input, select, textarea {
+      width: 100%;
+      padding: 0 12px;
+      outline: 0;
+      color: var(--ink);
+    }
+    textarea { min-height: 84px; padding-top: 11px; resize: vertical; }
+    input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(7,87,183,.12); }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .actions { display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; }
+    .receipt {
+      margin-top: 18px;
+      background: #fff;
+      border: 1px solid #1d2939;
+      min-height: 610px;
+      padding: 34px 28px;
+      font-family: Georgia, "Times New Roman", serif;
+      color: #101828;
+      line-height: 1.65;
+    }
+    .receipt h3 { text-align: center; font-size: 17px; margin-bottom: 22px; font-family: inherit; }
+    .receipt .line { border-bottom: 1px solid #344054; display: inline-block; min-width: 120px; text-align: center; font-weight: 700; }
+    .receipt .sign { width: 220px; border-top: 1px solid #344054; text-align: center; margin: 56px auto 0; padding-top: 4px; }
+    .receipt-photo { max-width: 120px; max-height: 80px; display: block; margin-top: 8px; border: 1px solid var(--line); }
+    .receipt-signature { max-width: 220px; max-height: 70px; display: block; margin: 36px auto 0; }
+    .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); margin-top: 16px; }
+    table { width: 100%; border-collapse: collapse; min-width: 760px; background: #fff; }
+    th, td { padding: 13px 14px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    th { color: #344054; background: #f9fafb; font-size: 12px; text-transform: uppercase; letter-spacing: .02em; }
+    tr:last-child td { border-bottom: 0; }
+    .avatar {
+      width: 32px; height: 32px; border-radius: 50%; background: var(--blue-soft);
+      color: var(--navy); display: inline-grid; place-items: center; font-weight: 800; margin-right: 8px;
+    }
+    .section { display: none; }
+    .section.active { display: block; }
+    .quick-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 22px; }
+    .quick { padding: 16px; display: flex; align-items: center; gap: 12px; min-height: 74px; border: 0; text-align: left; }
+    .quick span { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .search-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-top: 14px; }
+    .search-row .input { max-width: 310px; padding-left: 12px; }
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 6px; }
+    .chip { padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; font-weight: 750; }
+    .chip.active { background: var(--blue-soft); border-color: #bdd7ff; color: var(--blue); }
+    .drawer {
+      position: fixed; inset: 0; z-index: 30; display: none; align-items: flex-end; background: rgba(0,0,0,.28);
+    }
+    .drawer.open { display: flex; }
+    .modal {
+      width: min(720px, calc(100vw - 28px)); max-height: min(86vh, 760px); overflow: auto;
+      margin: auto; background: #fff; border-radius: var(--radius); padding: 22px; box-shadow: 0 24px 80px rgba(0,0,0,.22);
+    }
+    .toast {
+      position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+      background: var(--navy); color: #fff; border-radius: var(--radius); padding: 12px 14px;
+      box-shadow: var(--shadow); display: none; z-index: 40; max-width: calc(100vw - 28px);
+    }
+    .toast.show { display: block; }
+    .login-gate {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      min-height: 100vh;
+      padding: 22px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(180deg, var(--navy), var(--navy-2));
+      color: #fff;
+    }
+    .login-gate.hidden { display: none; }
+    .login-card {
+      width: min(430px, 100%);
+      background: #fff;
+      color: var(--ink);
+      border-radius: var(--radius);
+      box-shadow: 0 24px 80px rgba(0,0,0,.24);
+      padding: 24px;
+    }
+    .login-card .brand { color: var(--navy); padding: 0; margin-bottom: 22px; }
+    .login-card .brand-mark { border-color: var(--navy); }
+    .login-card .brand-sub { color: var(--muted); }
+    .login-status { min-height: 20px; margin-top: 10px; color: var(--danger); font-weight: 700; }
+    .mobile-nav {
+      position: fixed; left: 0; right: 0; bottom: 0; display: none; z-index: 20;
+      background: #fff; border-top: 1px solid var(--line); padding: 8px max(10px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-right));
+    }
+    .mobile-nav button {
+      border: 0; background: transparent; color: var(--muted); display: grid; justify-items: center; gap: 4px; font-size: 10px;
+    }
+    .mobile-nav button.active { color: var(--blue); }
+    .chart { width: 100%; height: 240px; display: block; margin-top: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
+    .note { padding: 12px; border-radius: var(--radius); background: var(--blue-soft); color: #194185; margin-top: 14px; }
+    .schema {
+      white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; background: #0b1220;
+      color: #d8e7ff; padding: 14px; border-radius: var(--radius); overflow: auto; font-size: 12px;
+    }
+    .signature-pad {
+      width: 100%;
+      height: 150px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      touch-action: none;
+      display: block;
+    }
+
+    @media (max-width: 1100px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .mobile-nav { display: grid; grid-template-columns: repeat(5, 1fr); }
+      .main { padding: 22px 14px 92px; }
+      .stats, .quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .content-grid { grid-template-columns: 1fr; }
+      .topbar { align-items: stretch; flex-direction: column; }
+      .toolbar { justify-content: flex-start; }
+    }
+    @media (max-width: 620px) {
+      h1 { font-size: 23px; }
+      .stats, .quick-grid, .two { grid-template-columns: 1fr; }
+      .panel { padding: 16px; }
+      .receipt { min-height: 520px; padding: 24px 18px; font-size: 13px; }
+      .actions, .search-row { align-items: stretch; flex-direction: column; }
+      .search-row .input, .btn { width: 100%; }
+      .btn.icon-only { width: 42px; }
+    }
+    @media print {
+      body * { visibility: hidden; }
+      .receipt, .receipt * { visibility: visible; }
+      .receipt { position: absolute; inset: 0; border: 0; min-height: auto; box-shadow: none; }
+      .mobile-nav, .sidebar, .topbar, .actions, .note { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-gate" id="loginGate">
+    <div class="login-card">
+      <div class="brand">
+        <div class="brand-mark">⚓</div>
+        <div>
+          <div class="brand-title">Capitan<br>Control</div>
+          <div class="brand-sub">Control de dinero a bordo</div>
+        </div>
+      </div>
+      <form class="form" id="gateLoginForm">
+        <div class="field"><label>Correo</label><input name="email" type="email" autocomplete="username" required></div>
+        <div class="field"><label>Password</label><input name="password" type="password" autocomplete="current-password" required></div>
+        <button class="btn primary" style="width:100%">Login</button>
+        <div class="login-status" id="loginStatus"></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">⚓</div>
+        <div>
+          <div class="brand-title">Capitan<br>Control</div>
+          <div class="brand-sub" data-i18n="brandSub">Control de dinero a bordo</div>
+        </div>
+      </div>
+      <nav class="nav" id="sideNav"></nav>
+      <div class="side-foot">
+        <div class="status-pill"><span class="dot" id="netDot"></span><span id="netText">Online</span></div>
+        <div class="status-pill"><span id="syncCount">0</span><span data-i18n="pendingSync">pendientes de sincronizar</span></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div>
+          <h1 id="pageTitle"></h1>
+          <p id="pageSub"></p>
+        </div>
+        <div class="toolbar">
+          <button class="btn" id="langBtn" title="Cambiar idioma">ES / EN</button>
+          <button class="btn" id="supabaseBtn" title="Configurar Supabase"></button>
+          <button class="btn primary" data-go="payments" id="newPaymentTop"></button>
+        </div>
+      </div>
+
+      <section class="section active" id="dashboard"></section>
+      <section class="section" id="payments"></section>
+      <section class="section" id="receipts"></section>
+      <section class="section" id="crew"></section>
+      <section class="section" id="catalogs"></section>
+      <section class="section" id="reports"></section>
+      <section class="section" id="settings"></section>
+    </main>
+  </div>
+
+  <nav class="mobile-nav" id="mobileNav"></nav>
+
+  <div class="drawer" id="modal">
+    <div class="modal">
+      <div class="topbar" style="margin-bottom:14px">
+        <div><h2 id="modalTitle"></h2><p id="modalSub"></p></div>
+        <button class="btn icon-only" id="closeModal" title="Cerrar"></button>
+      </div>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const icons = {
+      dashboard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg>',
+      receipt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/></svg>',
+      crew: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+      catalog: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
+      report: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-7"/></svg>',
+      settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1v.2a2 2 0 1 1-4 0V21a1.7 1.7 0 0 0-1-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1-.4h-.2a2 2 0 1 1 0-4H3a1.7 1.7 0 0 0 1.56-1 1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1v-.2a2 2 0 1 1 4 0V3a1.7 1.7 0 0 0 1 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.2.4.6.7 1 .7h.2a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1 .6z"/></svg>',
+      plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14"/></svg>',
+      save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>',
+      print: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>',
+      download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>',
+      close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+      sync: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 12A9 9 0 0 1 18.5 5.8L21 8"/><path d="M3 16h5M16 8h5"/></svg>',
+      trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 15H6L5 6"/></svg>'
+    };
+
+    const i18n = {
+      es: {
+        brandSub: 'Control de dinero a bordo', dashboard: 'Dashboard', payments: 'Entregas', receipts: 'Recibos', crew: 'Marinos',
+        catalogs: 'Catálogos', reports: 'Reportes', settings: 'Configuración', pendingSync: 'pendientes de sincronizar',
+        titleDashboard: 'Bienvenido', subDashboard: 'Controla pagos, recibos y reportes de tripulación pesquera.',
+        titlePayments: 'Nuevo pago', subPayments: 'Registra dinero, precio, evidencia y firma digital.',
+        titleReceipts: 'Recibos', subReceipts: 'Historial de recibos emitidos y listos para imprimir.',
+        titleCrew: 'Marinos', subCrew: 'Personal registrado por embarcación y cargo.',
+        titleCatalogs: 'Catálogos', subCatalogs: 'Embarcaciones, capitanes, cargos y conceptos.',
+        titleReports: 'Reportes', subReports: 'Filtra por marino, embarcación, capitán, concepto, fecha y temporada.',
+        titleSettings: 'Seguridad y Supabase', subSettings: 'Usuarios por capitán, roles, conexión, auditoría local y sincronización.',
+        newPayment: 'Nuevo recibo', configure: 'Supabase', totalPaid: 'Total entregado', crewCount: 'Marinos registrados',
+        receiptsIssued: 'Recibos emitidos', average: 'Promedio por marino', month: 'Este mes', onboard: 'A bordo',
+        sailor: 'Marino', vessel: 'Embarcación', captain: 'Capitán', role: 'Cargo', concept: 'Concepto', date: 'Fecha',
+        quantity: 'Cantidad', price: 'Precio', total: 'Total', notes: 'Observaciones', photo: 'Fotografía',
+        signature: 'Firma digital', savePayment: 'Generar recibo', clear: 'Limpiar', preview: 'Vista previa del recibo',
+        clearSignature: 'Limpiar firma',
+        receiptBy: 'Recibí de', amountText: 'La cantidad de', conceptText: 'Por concepto de', evidence: 'Evidencia',
+        signHere: 'Firma', printNote: 'Imprime el recibo o guárdalo como PDF desde el navegador.',
+        search: 'Buscar...', exportExcel: 'Exportar Excel', exportPdf: 'PDF/Imprimir', all: 'Todos',
+        add: 'Agregar', save: 'Guardar', delete: 'Eliminar', name: 'Nombre', phone: 'Teléfono', dni: 'DNI',
+        email: 'Correo', admin: 'Administrador', query: 'Consulta', language: 'Idioma', roleUser: 'Rol actual',
+        currentCaptain: 'Usuario capitán', accessNote: 'Los capitanes solo ven su embarcación, sus marinos y sus recibos.',
+        adminAccessNote: 'El administrador puede ver todas las embarcaciones, marinos, pagos y reportes.',
+        supabaseUrl: 'URL de Supabase', supabaseKey: 'Anon key de Supabase', syncNow: 'Sincronizar ahora',
+        connected: 'Online', offline: 'Sin conexión', synced: 'Sincronizado', savedLocal: 'Guardado localmente',
+        schema: 'Esquema SQL sugerido', setupHint: 'Crea estas tablas en Supabase y pega tu URL y anon key aquí.'
+      },
+      en: {
+        brandSub: 'Money control on board', dashboard: 'Dashboard', payments: 'Payments', receipts: 'Receipts', crew: 'Crew',
+        catalogs: 'Catalogs', reports: 'Reports', settings: 'Settings', pendingSync: 'pending sync',
+        titleDashboard: 'Welcome', subDashboard: 'Manage payments, receipts, and fishing crew reports.',
+        titlePayments: 'New payment', subPayments: 'Register money, price, evidence, and digital signature.',
+        titleReceipts: 'Receipts', subReceipts: 'Issued receipts ready to print.',
+        titleCrew: 'Crew', subCrew: 'Crew members by vessel and role.',
+        titleCatalogs: 'Catalogs', subCatalogs: 'Vessels, captains, roles, and payment concepts.',
+        titleReports: 'Reports', subReports: 'Filter by crew member, vessel, captain, concept, date, and season.',
+        titleSettings: 'Security and Supabase', subSettings: 'Captain users, roles, connection, local audit, and synchronization.',
+        newPayment: 'New receipt', configure: 'Supabase', totalPaid: 'Total paid', crewCount: 'Registered crew',
+        receiptsIssued: 'Receipts issued', average: 'Average per sailor', month: 'This month', onboard: 'On board',
+        sailor: 'Sailor', vessel: 'Vessel', captain: 'Captain', role: 'Role', concept: 'Concept', date: 'Date',
+        quantity: 'Quantity', price: 'Price', total: 'Total', notes: 'Notes', photo: 'Photo',
+        signature: 'Digital signature', savePayment: 'Generate receipt', clear: 'Clear', preview: 'Receipt preview',
+        clearSignature: 'Clear signature',
+        receiptBy: 'Received from', amountText: 'The amount of', conceptText: 'For concept of', evidence: 'Evidence',
+        signHere: 'Signature', printNote: 'Print the receipt or save it as PDF from the browser.',
+        search: 'Search...', exportExcel: 'Export Excel', exportPdf: 'PDF/Print', all: 'All',
+        add: 'Add', save: 'Save', delete: 'Delete', name: 'Name', phone: 'Phone', dni: 'ID',
+        email: 'Email', admin: 'Administrator', query: 'View only', language: 'Language', roleUser: 'Current role',
+        currentCaptain: 'Captain user', accessNote: 'Captains only see their vessel, their crew, and their receipts.',
+        adminAccessNote: 'The administrator can see all vessels, crew, payments, and reports.',
+        supabaseUrl: 'Supabase URL', supabaseKey: 'Supabase anon key', syncNow: 'Sync now',
+        connected: 'Online', offline: 'Offline', synced: 'Synced', savedLocal: 'Saved locally',
+        schema: 'Suggested SQL schema', setupHint: 'Create these tables in Supabase, then paste your URL and anon key here.'
+      }
+    };
+
+    const defaults = {
+      captains: [
+        { id: 'cap-1', authUserId: '', name: 'ELVIS', phone: null, email: null },
+        { id: 'cap-2', authUserId: '', name: 'PICHY', phone: null, email: null },
+        { id: 'cap-3', authUserId: '', name: 'WILMER', phone: null, email: null },
+        { id: 'cap-4', authUserId: '', name: 'CHALO', phone: null, email: null },
+        { id: 'cap-5', authUserId: '', name: 'GALGA', phone: null, email: null }
+      ],
+      vessels: [
+        { id: 'ves-1', captainId: 'cap-1', name: 'Vessel 1', captain: 'ELVIS', season: '2026' },
+        { id: 'ves-2', captainId: 'cap-2', name: 'Vessel 2', captain: 'PICHY', season: '2026' },
+        { id: 'ves-3', captainId: 'cap-3', name: 'Vessel 3', captain: 'WILMER', season: '2026' },
+        { id: 'ves-4', captainId: 'cap-4', name: 'Vessel 4', captain: 'CHALO', season: '2026' },
+        { id: 'ves-5', captainId: 'cap-5', name: 'Vessel 5', captain: 'GALGA', season: '2026' }
+      ],
+      roles: ['Cubierta', 'Maquinas', 'Cocina', 'Buzo', 'Capitan'],
+      concepts: ['Adelanto', 'Viveres', 'Equipo', 'Combustible', 'Bono', 'Liquidacion'],
+      crew: [
+        { id: uid(), captainId: 'cap-1', vesselId: 'ves-1', name: 'Carlos Martinez', dni: '0801-1990-12345', phone: '504 9876-1111', vessel: 'Langostera Norte', role: 'Cubierta', active: true },
+        { id: uid(), captainId: 'cap-1', vesselId: 'ves-1', name: 'Jose Ramirez', dni: '0801-1988-23456', phone: '504 9876-2222', vessel: 'Langostera Norte', role: 'Maquinas', active: true },
+        { id: uid(), captainId: 'cap-2', vesselId: 'ves-2', name: 'Luis Ortega', dni: '0801-1994-34567', phone: '504 9876-3333', vessel: 'Reina del Caribe', role: 'Buzo', active: true },
+        { id: uid(), captainId: 'cap-3', vesselId: 'ves-3', name: 'Ramon Castillo', dni: '0801-1987-44444', phone: '504 9876-4444', vessel: 'Estrella del Mar', role: 'Cocina', active: true },
+        { id: uid(), captainId: 'cap-4', vesselId: 'ves-4', name: 'Oscar Medina', dni: '0801-1991-55555', phone: '504 9876-5555', vessel: 'Caribe Azul', role: 'Cubierta', active: true },
+        { id: uid(), captainId: 'cap-5', vesselId: 'ves-5', name: 'Hector Cruz', dni: '0801-1993-66666', phone: '504 9876-6666', vessel: 'Santa Elena', role: 'Buzo', active: true }
+      ],
+      payments: [],
+      audit: []
+    };
+
+    const APP_SUPABASE_CONFIG = {
+      url: 'https://hsekrxabiuyvpflumekp.supabase.co',
+      key: 'sb_publishable_UhnWVr2e8skCHcTiYlGejA_DPXRl9e2'
+    };
+
+    const state = {
+      lang: localStorage.getItem('cc_lang') || 'es',
+      view: 'dashboard',
+      db: loadDb(),
+      config: { ...JSON.parse(localStorage.getItem('cc_config') || '{}'), ...APP_SUPABASE_CONFIG },
+      filter: '',
+      reportFilter: {},
+      supabase: null,
+      session: null,
+      realtimeChannel: null
+    };
+
+    function loadDb() {
+      const saved = localStorage.getItem('cc_db');
+      if (saved) return normalizeDb(JSON.parse(saved));
+      localStorage.setItem('cc_db', JSON.stringify(defaults));
+      return JSON.parse(JSON.stringify(defaults));
+    }
+    function normalizeDb(db) {
+      const merged = { ...JSON.parse(JSON.stringify(defaults)), ...db };
+      merged.captains = merged.captains.map((captain, index) => ({ id: captain.id || `cap-${index + 1}`, authUserId: captain.authUserId || '', ...captain }));
+      merged.vessels = merged.vessels.map((vessel, index) => {
+        const captain = merged.captains.find(c => c.name === vessel.captain) || merged.captains[index] || merged.captains[0];
+        return { id: vessel.id || `ves-${index + 1}`, captainId: vessel.captainId || captain?.id || '', ...vessel };
+      });
+      merged.crew = merged.crew.map(member => {
+        const vessel = merged.vessels.find(v => v.name === member.vessel) || merged.vessels.find(v => v.id === member.vesselId) || merged.vessels[0];
+        return { ...member, id: member.id || uid(), vesselId: member.vesselId || vessel?.id || '', captainId: member.captainId || vessel?.captainId || '' };
+      });
+      merged.payments = (merged.payments || []).map(payment => {
+        const vessel = merged.vessels.find(v => v.name === payment.vessel) || merged.vessels.find(v => v.id === payment.vesselId);
+        return { ...payment, id: payment.id || uid(), vesselId: payment.vesselId || vessel?.id || '', captainId: payment.captainId || vessel?.captainId || '', synced: !!payment.synced };
+      });
+      return merged;
+    }
+    function persist() { localStorage.setItem('cc_db', JSON.stringify(state.db)); updateSyncCount(); }
+    function t(key) { return i18n[state.lang][key] || key; }
+    function money(value) { return 'L ' + Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+    function today() { return new Date().toISOString().slice(0, 10); }
+    function monthName(date) { return new Date(date + 'T12:00:00').toLocaleDateString(state.lang === 'es' ? 'es-HN' : 'en-US', { month: 'long' }); }
+    function icon(name) { return icons[name] || ''; }
+    function uid() {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+      return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+    }
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+    }
+    function toast(message) {
+      const el = document.getElementById('toast');
+      el.textContent = message;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 2600);
+    }
+    function setLoginMessage(message) {
+      const el = document.getElementById('loginStatus');
+      if (el) el.textContent = message || '';
+    }
+    function updateAuthGate() {
+      const gate = document.getElementById('loginGate');
+      if (!gate) return;
+      gate.classList.toggle('hidden', !!state.session);
+      document.body.classList.toggle('locked', !state.session);
+    }
+    function recordAudit(action, detail) {
+      state.db.audit.unshift({ id: uid(), action, detail, at: new Date().toISOString(), role: state.config.role || 'Administrador' });
+      state.db.audit = state.db.audit.slice(0, 100);
+    }
+    function currentRole() {
+      return state.config.role || 'Administrador';
+    }
+    function isAdmin() {
+      return currentRole() === t('admin') || currentRole() === 'Administrador' || currentRole() === 'Administrator';
+    }
+    function currentCaptainId() {
+      return state.config.captainId || state.db.captains[0]?.id || '';
+    }
+    function currentCaptain() {
+      return state.db.captains.find(c => c.id === currentCaptainId()) || state.db.captains[0] || {};
+    }
+    function visibleVessels() {
+      return isAdmin() ? state.db.vessels : state.db.vessels.filter(v => v.captainId === currentCaptainId());
+    }
+    function visibleCrew() {
+      return isAdmin() ? state.db.crew : state.db.crew.filter(c => c.captainId === currentCaptainId());
+    }
+    function visiblePayments() {
+      return isAdmin() ? state.db.payments : state.db.payments.filter(p => p.captainId === currentCaptainId());
+    }
+    function scopedPaymentPayload(data) {
+      const vessel = visibleVessels().find(v => v.name === data.vessel) || state.db.vessels.find(v => v.name === data.vessel) || visibleVessels()[0] || {};
+      return { ...data, vesselId: vessel.id || '', captainId: vessel.captainId || currentCaptainId() };
+    }
+
+    const navItems = [
+      ['dashboard', 'dashboard', 'dashboard'],
+      ['payments', 'receipt', 'payments'],
+      ['receipts', 'receipt', 'receipts'],
+      ['crew', 'crew', 'crew'],
+      ['catalogs', 'catalog', 'catalogs'],
+      ['reports', 'report', 'reports'],
+      ['settings', 'settings', 'settings']
+    ];
+
+    function renderNav() {
+      const side = document.getElementById('sideNav');
+      const mobile = document.getElementById('mobileNav');
+      side.innerHTML = navItems.map(([view, ic, label]) => `
+        <button class="${state.view === view ? 'active' : ''}" data-go="${view}">${icon(ic)}<span>${t(label)}</span></button>
+      `).join('');
+      mobile.innerHTML = navItems.slice(0, 5).map(([view, ic, label]) => `
+        <button class="${state.view === view ? 'active' : ''}" data-go="${view}">${icon(ic)}<span>${t(label)}</span></button>
+      `).join('');
+    }
+
+    function go(view) {
+      state.view = view;
+      document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === view));
+      document.getElementById('pageTitle').textContent = pageTitleFor(view);
+      document.getElementById('pageSub').textContent = t('sub' + view[0].toUpperCase() + view.slice(1));
+      renderNav();
+      renderView();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    function pageTitleFor(view) {
+      if (view !== 'dashboard') return t('title' + view[0].toUpperCase() + view.slice(1));
+      if (isAdmin()) return state.lang === 'es' ? 'Bienvenido, Admin' : 'Welcome, Admin';
+      const name = currentCaptain().name || (state.lang === 'es' ? 'Capitan' : 'Captain');
+      return state.lang === 'es' ? `Bienvenido, ${name}` : `Welcome, ${name}`;
+    }
+
+    function paymentTotal(p) { return Number(p.quantity || 0) * Number(p.price || 0); }
+    function blankReceiptData() {
+      const sailor = visibleCrew()[0] || {};
+      const vessel = visibleVessels().find(v => v.name === sailor.vessel) || visibleVessels()[0] || {};
+      return {
+        sailorName: sailor.name || '',
+        dni: sailor.dni || '',
+        vessel: sailor.vessel || vessel.name || '',
+        captain: vessel.captain || currentCaptain().name || '',
+        concept: state.db.concepts[0] || '',
+        date: today(),
+        quantity: 1,
+        price: 0,
+        total: 0,
+        notes: '',
+        photo: ''
+      };
+    }
+    function currentReceiptData() {
+      const formEl = document.getElementById('paymentForm');
+      if (!formEl) return blankReceiptData();
+      const form = new FormData(formEl);
+      const sailor = visibleCrew().find(c => c.id === form.get('crewId')) || visibleCrew()[0] || {};
+      const qty = Number(form.get('quantity') || 0);
+      const price = Number(form.get('price') || 0);
+      return {
+        sailorName: sailor.name || '',
+        dni: sailor.dni || '',
+        vessel: form.get('vessel') || sailor.vessel || '',
+        captain: form.get('captain') || visibleVessels().find(v => v.name === sailor.vessel)?.captain || '',
+        concept: form.get('concept') || '',
+        date: form.get('date') || today(),
+        quantity: qty,
+        price,
+        total: qty * price,
+        notes: form.get('notes') || '',
+        photo: document.getElementById('photoPreview')?.src || '',
+        signature: document.getElementById('sigPad')?.dataset.signed ? document.getElementById('sigPad').toDataURL('image/png') : ''
+      };
+    }
+
+    function renderReceipt(p) {
+      const data = p || currentReceiptData();
+      const d = new Date((data.date || today()) + 'T12:00:00');
+      const day = d.getDate();
+      const year = d.getFullYear();
+      return `
+        <div class="receipt">
+          <h3>${state.lang === 'es' ? 'RECIBO POR' : 'RECEIPT FOR'} <span class="line">${money(data.total)}</span></h3>
+          <p>${state.lang === 'es' ? 'Yo' : 'I'}: <strong>${escapeHtml(data.sailorName || '________________')}</strong></p>
+          <p>${t('dni')}: ${escapeHtml(data.dni || '________________')}</p>
+          <p>${t('receiptBy')}: <strong>${escapeHtml(data.captain || '________________')}</strong></p>
+          <br>
+          <p>${t('amountText')}: <strong>${money(data.total)}</strong></p>
+          <p>${state.lang === 'es' ? 'Cantidad' : 'Quantity'}: ${Number(data.quantity || 0).toLocaleString()} x ${money(data.price)}</p>
+          <p>${t('conceptText')}: <strong>${escapeHtml(data.concept || '________________')}</strong></p>
+          ${data.notes ? `<p>${t('notes')}: ${escapeHtml(data.notes)}</p>` : ''}
+          ${data.photo ? `<p>${t('evidence')}:</p><img class="receipt-photo" src="${data.photo}" alt="Evidencia">` : ''}
+          <br>
+          <p>${state.lang === 'es' ? 'Para constancia firmo en la ciudad de Guanaja, Islas de la Bahia, a los' : 'Signed in Guanaja, Bay Islands, on'} <span class="line">${day}</span> ${state.lang === 'es' ? 'dias del mes de' : 'of'} <span class="line">${monthName(data.date)}</span> ${state.lang === 'es' ? 'de' : ''} <span class="line">${year}</span>.</p>
+          ${data.signature ? `<img class="receipt-signature" src="${data.signature}" alt="${t('signature')}">` : ''}
+          <div class="sign">${t('signHere')}</div>
+        </div>`;
+    }
+
+    function dashboardStats() {
+      const total = visiblePayments().reduce((sum, p) => sum + paymentTotal(p), 0);
+      const receipts = visiblePayments().length;
+      const crew = visibleCrew().filter(c => c.active).length;
+      const avg = crew ? total / crew : 0;
+      return { total, receipts, crew, avg };
+    }
+
+    function renderDashboard() {
+      const stats = dashboardStats();
+      const byCrew = groupPayments('sailorName');
+      document.getElementById('dashboard').innerHTML = `
+        <div class="grid stats">
+          ${statCard('blue', 'receipt', t('totalPaid'), money(stats.total), t('month'))}
+          ${statCard('green', 'crew', t('crewCount'), stats.crew, t('onboard'))}
+          ${statCard('gold', 'catalog', t('receiptsIssued'), stats.receipts, t('month'))}
+          ${statCard('purple', 'report', t('average'), money(stats.avg), t('month'))}
+        </div>
+        <div class="grid content-grid">
+          <div class="panel">
+            <h2>${t('newPayment')}</h2>
+            <p>${t('subPayments')}</p>
+            ${paymentForm()}
+          </div>
+          <div class="panel">
+            <h2>${t('preview')}</h2>
+            <div id="receiptPreview">${renderReceipt()}</div>
+            <div class="note">${t('printNote')}</div>
+          </div>
+        </div>
+        <div class="panel" style="margin-top:22px">
+          <div class="search-row">
+            <div><h2>${state.lang === 'es' ? 'Entregas por marino' : 'Payments by sailor'}</h2><p>${state.lang === 'es' ? 'Resumen total entregado a cada marino' : 'Total summary per crew member'}</p></div>
+            <button class="btn" onclick="exportCsv()">${icon('download')}${t('exportExcel')}</button>
+          </div>
+          ${paymentsSummaryTable(byCrew)}
+        </div>
+        <div class="grid quick-grid">
+          ${quick('payments', 'receipt', t('newPayment'), t('subPayments'))}
+          ${quick('receipts', 'receipt', t('receipts'), t('subReceipts'))}
+          ${quick('reports', 'report', t('reports'), t('subReports'))}
+          ${quick('settings', 'settings', t('settings'), t('subSettings'))}
+        </div>`;
+      bindPaymentForm();
+    }
+
+    function statCard(color, ic, label, value, sub) {
+      return `<div class="stat"><div class="stat-head"><span class="bubble ${color}">${icon(ic)}</span><span>${label}</span></div><strong>${value}</strong><p>${sub}</p></div>`;
+    }
+    function quick(view, ic, title, sub) {
+      return `<button class="quick" data-go="${view}"><span class="bubble blue">${icon(ic)}</span><strong>${title}<span>${sub}</span></strong></button>`;
+    }
+
+    function paymentForm() {
+      const crewRows = visibleCrew();
+      const vessels = visibleVessels();
+      const captains = isAdmin() ? state.db.captains : [currentCaptain()];
+      const vesselOptions = vessels.map(v => `<option>${escapeHtml(v.name)}</option>`).join('');
+      const captainOptions = captains.map(c => `<option>${escapeHtml(c.name)}</option>`).join('');
+      return `
+        <form class="form" id="paymentForm">
+          <div class="field"><label>${t('sailor')}</label><select name="crewId" required>${crewRows.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select></div>
+          <div class="two">
+            <div class="field"><label>${t('vessel')}</label><select name="vessel">${vesselOptions}</select></div>
+            <div class="field"><label>${t('captain')}</label><select name="captain">${captainOptions}</select></div>
+          </div>
+          <div class="field"><label>${t('concept')}</label><select name="concept">${state.db.concepts.map(c => `<option>${escapeHtml(c)}</option>`).join('')}</select></div>
+          <div class="two">
+            <div class="field"><label>${t('quantity')}</label><input name="quantity" type="number" min="0" step="0.01" value="1" required></div>
+            <div class="field"><label>${t('price')}</label><input name="price" type="number" min="0" step="0.01" placeholder="0.00" required></div>
+          </div>
+          <div class="two">
+            <div class="field"><label>${t('date')}</label><input name="date" type="date" value="${today()}" required></div>
+            <div class="field"><label>${t('photo')}</label><input name="photo" type="file" accept="image/*" capture="environment"></div>
+          </div>
+          <div class="field"><label>${t('notes')}</label><textarea name="notes"></textarea></div>
+          <div class="field"><label>${t('signature')}</label><canvas id="sigPad" class="signature-pad" width="680" height="180"></canvas></div>
+          <img id="photoPreview" class="receipt-photo" alt="" style="display:none">
+          <div class="actions">
+            <button type="reset" class="btn">${t('clear')}</button>
+            <button type="button" class="btn" id="clearSig">${t('clearSignature')}</button>
+            <button type="button" class="btn" onclick="window.print()">${icon('print')}${t('exportPdf')}</button>
+            <button type="submit" class="btn primary">${icon('save')}${t('savePayment')}</button>
+          </div>
+        </form>`;
+    }
+
+    function bindPaymentForm() {
+      const form = document.getElementById('paymentForm');
+      if (!form) return;
+      const crew = visibleCrew()[0] || {};
+      const vessel = visibleVessels().find(v => v.name === crew.vessel);
+      if (crew.vessel) form.elements.vessel.value = crew.vessel;
+      if (vessel?.captain) form.elements.captain.value = vessel.captain;
+      form.addEventListener('input', updateReceiptPreview);
+      setupSignaturePad();
+      form.elements.crewId.addEventListener('change', () => {
+        const selected = visibleCrew().find(c => c.id === form.elements.crewId.value);
+        const selectedVessel = visibleVessels().find(v => v.name === selected?.vessel);
+        if (selected?.vessel) form.elements.vessel.value = selected.vessel;
+        if (selectedVessel?.captain) form.elements.captain.value = selectedVessel.captain;
+        updateReceiptPreview();
+      });
+      form.elements.photo.addEventListener('change', event => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const img = document.getElementById('photoPreview');
+          img.src = reader.result;
+          img.style.display = 'block';
+          updateReceiptPreview();
+        };
+        reader.readAsDataURL(file);
+      });
+      form.addEventListener('submit', event => {
+        event.preventDefault();
+        const data = currentReceiptData();
+        const payment = { id: uid(), number: nextReceiptNumber(), ...scopedPaymentPayload(data), synced: false, createdAt: new Date().toISOString() };
+        state.db.payments.unshift(payment);
+        recordAudit('payment.created', `${payment.number} ${payment.sailorName} ${money(payment.total)}`);
+        persist();
+        form.reset();
+        clearSignaturePad();
+        toast(t('savedLocal'));
+        renderView();
+        syncSupabase();
+      });
+      updateReceiptPreview();
+    }
+    function setupSignaturePad() {
+      const canvas = document.getElementById('sigPad');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#101828';
+      let drawing = false;
+      const point = event => {
+        const rect = canvas.getBoundingClientRect();
+        const touch = event.touches ? event.touches[0] : event;
+        return { x: (touch.clientX - rect.left) * canvas.width / rect.width, y: (touch.clientY - rect.top) * canvas.height / rect.height };
+      };
+      const start = event => {
+        event.preventDefault();
+        drawing = true;
+        const p = point(event);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+      };
+      const move = event => {
+        if (!drawing) return;
+        event.preventDefault();
+        const p = point(event);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+        canvas.dataset.signed = 'true';
+        updateReceiptPreview();
+      };
+      const stop = () => { drawing = false; };
+      canvas.addEventListener('mousedown', start);
+      canvas.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', stop);
+      canvas.addEventListener('touchstart', start, { passive: false });
+      canvas.addEventListener('touchmove', move, { passive: false });
+      canvas.addEventListener('touchend', stop);
+      document.getElementById('clearSig')?.addEventListener('click', clearSignaturePad);
+    }
+    function clearSignaturePad() {
+      const canvas = document.getElementById('sigPad');
+      if (!canvas) return;
+      canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+      delete canvas.dataset.signed;
+      updateReceiptPreview();
+    }
+    function updateReceiptPreview() {
+      const preview = document.getElementById('receiptPreview');
+      if (preview) preview.innerHTML = renderReceipt();
+    }
+    function nextReceiptNumber() {
+      const prefix = isAdmin() ? 'ADM' : currentCaptainId().replace('cap-', 'CAP');
+      return prefix + '-REC-' + String(visiblePayments().length + 1).padStart(5, '0');
+    }
+
+    function groupPayments(key) {
+      return visiblePayments().reduce((map, p) => {
+        const name = p[key] || 'N/A';
+        if (!map[name]) map[name] = { count: 0, total: 0, last: '', vessel: p.vessel };
+        map[name].count += 1;
+        map[name].total += paymentTotal(p);
+        map[name].last = !map[name].last || p.date > map[name].last ? p.date : map[name].last;
+        return map;
+      }, {});
+    }
+    function paymentsSummaryTable(group) {
+      const rows = Object.entries(group);
+      return `<div class="table-wrap"><table><thead><tr><th>${t('sailor')}</th><th>${t('vessel')}</th><th>${t('total')}</th><th>${state.lang === 'es' ? 'Ultima entrega' : 'Last payment'}</th><th>${t('receipts')}</th></tr></thead><tbody>
+        ${rows.length ? rows.map(([name, r]) => `<tr><td><span class="avatar">${escapeHtml(name[0])}</span>${escapeHtml(name)}</td><td>${escapeHtml(r.vessel)}</td><td>${money(r.total)}</td><td>${r.last}</td><td>${r.count}</td></tr>`).join('') : `<tr><td colspan="5">${state.lang === 'es' ? 'Sin pagos registrados' : 'No payments yet'}</td></tr>`}
+      </tbody></table></div>`;
+    }
+
+    function renderPayments() {
+      document.getElementById('payments').innerHTML = `<div class="grid content-grid"><div class="panel"><h2>${t('newPayment')}</h2><p>${t('subPayments')}</p>${paymentForm()}</div><div class="panel"><h2>${t('preview')}</h2><div id="receiptPreview">${renderReceipt()}</div><div class="note">${t('printNote')}</div></div></div>`;
+      bindPaymentForm();
+    }
+    function renderReceipts() {
+      const q = state.filter.toLowerCase();
+      const rows = visiblePayments().filter(p => JSON.stringify(p).toLowerCase().includes(q));
+      document.getElementById('receipts').innerHTML = `
+        <div class="panel">
+          <div class="search-row">
+            <input class="input" placeholder="${t('search')}" value="${escapeHtml(state.filter)}" oninput="state.filter=this.value;renderReceipts()">
+            <div class="actions"><button class="btn" onclick="exportCsv()">${icon('download')}${t('exportExcel')}</button><button class="btn" onclick="window.print()">${icon('print')}${t('exportPdf')}</button></div>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>#</th><th>${t('date')}</th><th>${t('sailor')}</th><th>${t('concept')}</th><th>${t('total')}</th><th>${t('vessel')}</th><th>${t('settings')}</th></tr></thead><tbody>
+          ${rows.map(p => `<tr><td>${p.number}</td><td>${p.date}</td><td>${escapeHtml(p.sailorName)}</td><td>${escapeHtml(p.concept)}</td><td>${money(p.total)}</td><td>${escapeHtml(p.vessel)}</td><td><button class="btn icon-only" title="Imprimir" onclick="printReceipt('${p.id}')">${icon('print')}</button></td></tr>`).join('') || `<tr><td colspan="7">Sin recibos</td></tr>`}
+          </tbody></table></div>
+          <div id="printSlot" style="display:none"></div>
+        </div>`;
+    }
+    function printReceipt(id) {
+      const p = visiblePayments().find(x => x.id === id);
+      if (!p) return toast(t('accessNote'));
+      document.getElementById('printSlot').innerHTML = renderReceipt(p);
+      document.getElementById('printSlot').style.display = 'block';
+      setTimeout(() => {
+        window.print();
+        document.getElementById('printSlot').style.display = 'none';
+      }, 100);
+    }
+
+    function renderCrew() {
+      const rows = visibleCrew();
+      document.getElementById('crew').innerHTML = `
+        <div class="panel">
+          <div class="search-row"><div><h2>${t('crew')}</h2><p>${t('subCrew')}</p></div><button class="btn primary" onclick="openEntityModal('crew')">${icon('plus')}${t('add')}</button></div>
+          <div class="table-wrap"><table><thead><tr><th>${t('name')}</th><th>${t('dni')}</th><th>${t('phone')}</th><th>${t('vessel')}</th><th>${t('role')}</th><th>${t('delete')}</th></tr></thead><tbody>
+          ${rows.map(c => `<tr><td><span class="avatar">${escapeHtml(c.name[0])}</span>${escapeHtml(c.name)}</td><td>${escapeHtml(c.dni)}</td><td>${escapeHtml(c.phone)}</td><td>${escapeHtml(c.vessel)}</td><td>${escapeHtml(c.role)}</td><td><button class="btn icon-only danger" onclick="deleteEntity('crew','${c.id}')">${icon('trash')}</button></td></tr>`).join('')}
+          </tbody></table></div>
+        </div>`;
+    }
+    function renderCatalogs() {
+      if (!isAdmin()) {
+        document.getElementById('catalogs').innerHTML = `<div class="panel"><h2>${t('catalogs')}</h2><div class="note">${t('accessNote')}</div>${paymentsSummaryTable(groupPayments('sailorName'))}</div>`;
+        return;
+      }
+      document.getElementById('catalogs').innerHTML = `
+        <div class="grid content-grid">
+          ${catalogPanel('vessels', t('vessel'), ['name','captain','season'])}
+          ${catalogPanel('captains', t('captain'), ['name','phone','email'])}
+          ${listPanel('roles', t('role'))}
+          ${listPanel('concepts', t('concept'))}
+        </div>`;
+    }
+    function catalogPanel(key, title, fields) {
+      return `<div class="panel"><div class="search-row"><h2>${title}</h2><button class="btn primary" onclick="openEntityModal('${key}')">${icon('plus')}${t('add')}</button></div><div class="table-wrap"><table><thead><tr>${fields.map(f => `<th>${f}</th>`).join('')}<th></th></tr></thead><tbody>${state.db[key].map(item => `<tr>${fields.map(f => `<td>${escapeHtml(item[f])}</td>`).join('')}<td><button class="btn icon-only danger" onclick="deleteEntity('${key}','${item.id}')">${icon('trash')}</button></td></tr>`).join('')}</tbody></table></div></div>`;
+    }
+    function listPanel(key, title) {
+      return `<div class="panel"><div class="search-row"><h2>${title}</h2><button class="btn primary" onclick="openListModal('${key}')">${icon('plus')}${t('add')}</button></div><div class="table-wrap"><table><tbody>${state.db[key].map(item => `<tr><td>${escapeHtml(item)}</td><td><button class="btn icon-only danger" onclick="deleteListItem('${key}','${escapeHtml(item)}')">${icon('trash')}</button></td></tr>`).join('')}</tbody></table></div></div>`;
+    }
+
+    function renderReports() {
+      const filtered = filterPayments();
+      const crewRows = visibleCrew();
+      const vessels = visibleVessels();
+      document.getElementById('reports').innerHTML = `
+        <div class="panel">
+          <div class="two">
+            <div class="field"><label>${t('sailor')}</label><select onchange="state.reportFilter.sailorName=this.value;renderReports()"><option value="">${t('all')}</option>${crewRows.map(c => `<option ${state.reportFilter.sailorName === c.name ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></div>
+            <div class="field"><label>${t('vessel')}</label><select onchange="state.reportFilter.vessel=this.value;renderReports()"><option value="">${t('all')}</option>${vessels.map(v => `<option ${state.reportFilter.vessel === v.name ? 'selected' : ''}>${escapeHtml(v.name)}</option>`).join('')}</select></div>
+            <div class="field"><label>${t('concept')}</label><select onchange="state.reportFilter.concept=this.value;renderReports()"><option value="">${t('all')}</option>${state.db.concepts.map(c => `<option ${state.reportFilter.concept === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}</select></div>
+            <div class="field"><label>${state.lang === 'es' ? 'Desde' : 'From'}</label><input type="date" value="${state.reportFilter.from || ''}" onchange="state.reportFilter.from=this.value;renderReports()"></div>
+          </div>
+          <canvas class="chart" id="reportChart" width="900" height="260"></canvas>
+          <div class="actions" style="margin-top:14px"><button class="btn" onclick="exportCsv(filterPayments())">${icon('download')}${t('exportExcel')}</button><button class="btn" onclick="window.print()">${icon('print')}${t('exportPdf')}</button></div>
+          ${paymentsTable(filtered)}
+        </div>`;
+      drawChart(filtered);
+    }
+    function filterPayments() {
+      return visiblePayments().filter(p => {
+        const f = state.reportFilter;
+        return (!f.sailorName || p.sailorName === f.sailorName) && (!f.vessel || p.vessel === f.vessel) && (!f.concept || p.concept === f.concept) && (!f.from || p.date >= f.from);
+      });
+    }
+    function paymentsTable(rows) {
+      return `<div class="table-wrap"><table><thead><tr><th>#</th><th>${t('date')}</th><th>${t('sailor')}</th><th>${t('vessel')}</th><th>${t('captain')}</th><th>${t('concept')}</th><th>${t('total')}</th></tr></thead><tbody>${rows.map(p => `<tr><td>${p.number}</td><td>${p.date}</td><td>${escapeHtml(p.sailorName)}</td><td>${escapeHtml(p.vessel)}</td><td>${escapeHtml(p.captain)}</td><td>${escapeHtml(p.concept)}</td><td>${money(p.total)}</td></tr>`).join('') || `<tr><td colspan="7">Sin datos</td></tr>`}</tbody></table></div>`;
+    }
+    function drawChart(rows) {
+      const canvas = document.getElementById('reportChart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      const group = rows.reduce((m,p)=>{m[p.concept]=(m[p.concept]||0)+paymentTotal(p);return m;},{});
+      const entries = Object.entries(group).slice(0,8);
+      const max = Math.max(1, ...entries.map(e=>e[1]));
+      ctx.fillStyle = '#101828'; ctx.font = '16px sans-serif'; ctx.fillText(state.lang === 'es' ? 'Pagos por concepto' : 'Payments by concept', 24, 32);
+      entries.forEach(([label,value], i) => {
+        const y = 60 + i * 24;
+        ctx.fillStyle = '#eaf3ff'; ctx.fillRect(150, y - 14, 680, 16);
+        ctx.fillStyle = i % 2 ? '#0757b7' : '#002856'; ctx.fillRect(150, y - 14, 680 * value / max, 16);
+        ctx.fillStyle = '#344054'; ctx.font = '12px sans-serif'; ctx.fillText(label, 24, y); ctx.fillText(money(value), 840, y);
+      });
+    }
+
+    function renderSettings() {
+      const connectedHost = APP_SUPABASE_CONFIG.url.replace('https://', '');
+      document.getElementById('settings').innerHTML = `
+        <div class="grid content-grid">
+          <div class="panel">
+            <h2>${t('settings')}</h2>
+            <p>${state.lang === 'es' ? 'Conexion activa con Supabase.' : 'Active Supabase connection.'}</p>
+            <div class="note">${connectedHost}</div>
+            <div class="form">
+              <div class="note">${isAdmin() ? t('adminAccessNote') : t('accessNote')}</div>
+              <div class="actions"><button class="btn" type="button" onclick="syncSupabase(true)">${icon('sync')}${t('syncNow')}</button></div>
+            </div>
+          </div>
+          <div class="panel">
+            <h2>Login Supabase</h2>
+            <p>${state.session?.user?.email ? escapeHtml(state.session.user.email) : 'Sin sesion iniciada'}</p>
+            <form class="form" id="loginForm">
+              <div class="field"><label>${t('email')}</label><input name="email" type="email" autocomplete="username"></div>
+              <div class="field"><label>Password</label><input name="password" type="password" autocomplete="current-password"></div>
+              <div class="actions"><button class="btn" type="button" onclick="signOutSupabase()">Cerrar sesion</button><button class="btn primary">Login</button></div>
+            </form>
+          </div>
+        </div>
+        <div class="panel" style="margin-top:18px"><h2>Auditoria</h2><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Accion</th><th>Detalle</th><th>Rol</th></tr></thead><tbody>${state.db.audit.map(a => `<tr><td>${new Date(a.at).toLocaleString()}</td><td>${escapeHtml(a.action)}</td><td>${escapeHtml(a.detail)}</td><td>${escapeHtml(a.role)}</td></tr>`).join('')}</tbody></table></div></div>`;
+      document.getElementById('loginForm').addEventListener('submit', async e => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(e.target));
+        await signInSupabase(data.email, data.password);
+      });
+    }
+
+    function sqlSchema() {
+      return `create table captains (id text primary key, auth_user_id uuid unique, name text not null, phone text, email text);
+create table vessels (id text primary key, captain_id text references captains(id), name text not null, captain text, season text);
+create table crew (id text primary key, captain_id text references captains(id), vessel_id text references vessels(id), name text not null, dni text, phone text, vessel text, role text, active boolean default true);
+create table roles (value text primary key);
+create table concepts (value text primary key);
+create table admin_users (auth_user_id uuid primary key, name text);
+create table payments (
+  id text primary key,
+  captain_id text references captains(id),
+  vessel_id text references vessels(id),
+  number text unique,
+  sailor_name text not null,
+  dni text,
+  vessel text,
+  captain text,
+  concept text,
+  date date,
+  quantity numeric,
+  price numeric,
+  total numeric,
+  notes text,
+  photo text,
+  signature text,
+  created_at timestamptz default now()
+);
+create table audit (id text primary key, action text, detail text, role text, at timestamptz default now());
+
+alter table captains enable row level security;
+alter table vessels enable row level security;
+alter table crew enable row level security;
+alter table payments enable row level security;
+alter table admin_users enable row level security;
+
+create policy "admin sees own admin row" on admin_users
+  for select using (auth.uid() = auth_user_id);
+
+create policy "admins manage captains" on captains
+  for all using (exists (select 1 from admin_users where auth_user_id = auth.uid()))
+  with check (exists (select 1 from admin_users where auth_user_id = auth.uid()));
+
+create policy "admins manage vessels" on vessels
+  for all using (exists (select 1 from admin_users where auth_user_id = auth.uid()))
+  with check (exists (select 1 from admin_users where auth_user_id = auth.uid()));
+
+create policy "admins manage crew" on crew
+  for all using (exists (select 1 from admin_users where auth_user_id = auth.uid()))
+  with check (exists (select 1 from admin_users where auth_user_id = auth.uid()));
+
+create policy "admins manage payments" on payments
+  for all using (exists (select 1 from admin_users where auth_user_id = auth.uid()))
+  with check (exists (select 1 from admin_users where auth_user_id = auth.uid()));
+
+create policy "captain sees own profile" on captains
+  for select using (auth.uid() = auth_user_id);
+
+create policy "captain sees own vessels" on vessels
+  for select using (captain_id in (select id from captains where auth_user_id = auth.uid()));
+
+create policy "captain manages own crew" on crew
+  for all using (captain_id in (select id from captains where auth_user_id = auth.uid()))
+  with check (captain_id in (select id from captains where auth_user_id = auth.uid()));
+
+create policy "captain manages own payments" on payments
+  for all using (captain_id in (select id from captains where auth_user_id = auth.uid()))
+  with check (captain_id in (select id from captains where auth_user_id = auth.uid()));`;
+    }
+
+    function openEntityModal(key) {
+      const fieldsByKey = {
+        crew: ['name','dni','phone','vessel','role'],
+        vessels: ['name','captain','season'],
+        captains: ['name','phone','email','authUserId']
+      };
+      const fields = fieldsByKey[key];
+      openModal(t('add'), key, `<form class="form" id="entityForm">${fields.map(f => `<div class="field"><label>${f}</label><input name="${f}" required></div>`).join('')}<div class="actions"><button class="btn primary">${icon('save')}${t('save')}</button></div></form>`);
+      document.getElementById('entityForm').addEventListener('submit', e => {
+        e.preventDefault();
+        const item = { id: uid(), ...Object.fromEntries(new FormData(e.target)) };
+        if (key === 'crew') {
+          const vessel = isAdmin() ? state.db.vessels.find(v => v.name === item.vessel) : visibleVessels()[0];
+          item.active = true;
+          item.vessel = vessel?.name || item.vessel;
+          item.vesselId = vessel?.id || '';
+          item.captainId = vessel?.captainId || currentCaptainId();
+        }
+        if (key === 'vessels') {
+          const captain = state.db.captains.find(c => c.name === item.captain) || currentCaptain();
+          item.captain = captain.name;
+          item.captainId = captain.id;
+        }
+        state.db[key].push(item);
+        recordAudit(`${key}.created`, item.name);
+        persist();
+        closeModal();
+        renderView();
+      });
+    }
+    function openListModal(key) {
+      openModal(t('add'), key, `<form class="form" id="listForm"><div class="field"><label>${t('name')}</label><input name="value" required></div><div class="actions"><button class="btn primary">${icon('save')}${t('save')}</button></div></form>`);
+      document.getElementById('listForm').addEventListener('submit', e => {
+        e.preventDefault();
+        state.db[key].push(new FormData(e.target).get('value'));
+        recordAudit(`${key}.created`, new FormData(e.target).get('value'));
+        persist();
+        closeModal();
+        renderView();
+      });
+    }
+    function deleteEntity(key, id) {
+      if (!isAdmin() && key !== 'crew') return toast(t('accessNote'));
+      if (!isAdmin() && key === 'crew' && !visibleCrew().some(item => item.id === id)) return toast(t('accessNote'));
+      state.db[key] = state.db[key].filter(item => item.id !== id);
+      recordAudit(`${key}.deleted`, id);
+      persist();
+      renderView();
+    }
+    function deleteListItem(key, value) {
+      state.db[key] = state.db[key].filter(item => item !== value);
+      recordAudit(`${key}.deleted`, value);
+      persist();
+      renderView();
+    }
+    function openModal(title, sub, body) {
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalSub').textContent = sub;
+      document.getElementById('modalBody').innerHTML = body;
+      document.getElementById('modal').classList.add('open');
+    }
+    function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+    function exportCsv(rows = visiblePayments()) {
+      const header = ['number','date','sailorName','dni','vessel','captain','concept','quantity','price','total','notes'];
+      const csv = [header.join(','), ...rows.map(p => header.map(h => `"${String(p[h] ?? '').replace(/"/g,'""')}"`).join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'reporte-pagos.csv';
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    function setupSupabase() {
+      if (!state.config.url || !state.config.key || !window.supabase) return null;
+      state.supabase = window.supabase.createClient(state.config.url, state.config.key);
+      return state.supabase;
+    }
+    function friendlySupabaseError(error) {
+      const message = error?.message || String(error || '');
+      if (/invalid api key/i.test(message)) {
+        return state.lang === 'es'
+          ? 'API key invalida. Copia la publishable key o anon key correcta de Supabase y reemplaza APP_SUPABASE_CONFIG.key en index.html.'
+          : 'Invalid API key. Copy the correct publishable key or anon key from Supabase and replace APP_SUPABASE_CONFIG.key in index.html.';
+      }
+      return message;
+    }
+    async function hydrateSession() {
+      const client = state.supabase || setupSupabase();
+      if (!client) return;
+      const { data } = await client.auth.getSession();
+      state.session = data.session;
+      updateAuthGate();
+      if (!state.session) return;
+      await applySessionScope();
+      await loadSupabaseData();
+      startRealtime();
+    }
+    async function applySessionScope() {
+      const userId = state.session?.user?.id;
+      if (!userId) return;
+      const client = state.supabase || setupSupabase();
+      if (!client) return;
+      const { data: adminRow } = await client.from('admin_users').select('*').eq('auth_user_id', userId).maybeSingle();
+      if (adminRow) {
+        state.config.role = 'Administrador';
+        localStorage.setItem('cc_config', JSON.stringify(state.config));
+        return;
+      }
+      const captain = state.db.captains.find(c => c.authUserId === userId);
+      if (captain) {
+        state.config.role = 'Capitan';
+        state.config.captainId = captain.id;
+        localStorage.setItem('cc_config', JSON.stringify(state.config));
+        return;
+      }
+      const { data, error } = await client.from('captains').select('*').eq('auth_user_id', userId).maybeSingle();
+      if (!error && data) {
+        const mapped = { id: data.id, authUserId: data.auth_user_id, name: data.name, phone: data.phone, email: data.email };
+        const existing = state.db.captains.findIndex(c => c.id === mapped.id);
+        if (existing >= 0) state.db.captains[existing] = { ...state.db.captains[existing], ...mapped };
+        else state.db.captains.push(mapped);
+        state.config.role = 'Capitan';
+        state.config.captainId = mapped.id;
+        localStorage.setItem('cc_config', JSON.stringify(state.config));
+        persist();
+      }
+    }
+    async function loadSupabaseData() {
+      const client = state.supabase || setupSupabase();
+      if (!client || !state.session) return;
+      const [captainsRes, vesselsRes, crewRes, paymentsRes, rolesRes, conceptsRes] = await Promise.all([
+        client.from('captains').select('*'),
+        client.from('vessels').select('*'),
+        client.from('crew').select('*'),
+        client.from('payments').select('*').order('created_at', { ascending: false }),
+        client.from('roles').select('*'),
+        client.from('concepts').select('*')
+      ]);
+      if (!captainsRes.error && captainsRes.data?.length) {
+        state.db.captains = captainsRes.data.map(c => ({ id: c.id, authUserId: c.auth_user_id, name: c.name, phone: c.phone, email: c.email }));
+      }
+      if (!vesselsRes.error && vesselsRes.data?.length) {
+        state.db.vessels = vesselsRes.data.map(v => ({ id: v.id, captainId: v.captain_id, name: v.name, captain: v.captain, season: v.season }));
+      }
+      if (!crewRes.error && crewRes.data) {
+        state.db.crew = crewRes.data.map(mapCrewRow);
+      }
+      if (!paymentsRes.error && paymentsRes.data) {
+        state.db.payments = paymentsRes.data.map(mapPaymentRow);
+      }
+      if (!rolesRes.error && rolesRes.data?.length) state.db.roles = rolesRes.data.map(r => r.value);
+      if (!conceptsRes.error && conceptsRes.data?.length) state.db.concepts = conceptsRes.data.map(c => c.value);
+      persist();
+      renderView();
+    }
+    function mapCrewRow(c) {
+      return { id: c.id, captainId: c.captain_id, vesselId: c.vessel_id, name: c.name, dni: c.dni, phone: c.phone, vessel: c.vessel, role: c.role, active: c.active };
+    }
+    function mapPaymentRow(p) {
+      return {
+        id: p.id,
+        captainId: p.captain_id,
+        vesselId: p.vessel_id,
+        number: p.number,
+        sailorName: p.sailor_name,
+        dni: p.dni,
+        vessel: p.vessel,
+        captain: p.captain,
+        concept: p.concept,
+        date: p.date,
+        quantity: p.quantity,
+        price: p.price,
+        total: p.total,
+        notes: p.notes,
+        photo: p.photo,
+        signature: p.signature,
+        createdAt: p.created_at,
+        synced: true
+      };
+    }
+    function upsertById(list, item) {
+      const index = list.findIndex(row => row.id === item.id);
+      if (index >= 0) list[index] = { ...list[index], ...item };
+      else list.unshift(item);
+    }
+    function startRealtime() {
+      const client = state.supabase || setupSupabase();
+      if (!client || !state.session) return;
+      if (state.realtimeChannel) client.removeChannel(state.realtimeChannel);
+      state.realtimeChannel = client
+        .channel('capitan-control-live')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, payload => {
+          if (payload.eventType === 'DELETE') state.db.payments = state.db.payments.filter(p => p.id !== payload.old.id);
+          else upsertById(state.db.payments, mapPaymentRow(payload.new));
+          persist();
+          renderView();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'crew' }, payload => {
+          if (payload.eventType === 'DELETE') state.db.crew = state.db.crew.filter(c => c.id !== payload.old.id);
+          else upsertById(state.db.crew, mapCrewRow(payload.new));
+          persist();
+          renderView();
+        })
+        .subscribe();
+    }
+    async function signInSupabase(email, password) {
+      const client = state.supabase || setupSupabase();
+      if (!client) {
+        const msg = state.lang === 'es' ? 'No se pudo conectar con Supabase.' : 'Could not connect to Supabase.';
+        setLoginMessage(msg);
+        return toast(msg);
+      }
+      state.session = null;
+      state.config.role = 'Consulta';
+      localStorage.setItem('cc_config', JSON.stringify(state.config));
+      updateAuthGate();
+      renderView();
+      const { data, error } = await client.auth.signInWithPassword({ email, password });
+      if (error) {
+        const msg = friendlySupabaseError(error);
+        setLoginMessage(msg);
+        return toast(msg);
+      }
+      state.session = data.session;
+      updateAuthGate();
+      setLoginMessage('');
+      await applySessionScope();
+      await loadSupabaseData();
+      startRealtime();
+      toast('Login OK');
+      go('dashboard');
+    }
+    async function signOutSupabase() {
+      const client = state.supabase || setupSupabase();
+      if (client && state.realtimeChannel) client.removeChannel(state.realtimeChannel);
+      state.realtimeChannel = null;
+      if (client) await client.auth.signOut();
+      state.session = null;
+      updateAuthGate();
+      toast('Sesion cerrada');
+      renderView();
+    }
+    async function syncSupabase(forceToast = false) {
+      const client = state.supabase || setupSupabase();
+      if (!client || !navigator.onLine) {
+        if (forceToast) toast(state.lang === 'es' ? 'Configura Supabase y verifica internet' : 'Configure Supabase and check internet');
+        return;
+      }
+      if (isAdmin()) {
+        await client.from('captains').upsert(state.db.captains.map(c => ({ id: c.id, auth_user_id: c.authUserId || null, name: c.name, phone: c.phone, email: c.email })));
+        await client.from('vessels').upsert(state.db.vessels.map(v => ({ id: v.id, captain_id: v.captainId, name: v.name, captain: v.captain, season: v.season })));
+        await client.from('roles').upsert(state.db.roles.map(value => ({ value })));
+        await client.from('concepts').upsert(state.db.concepts.map(value => ({ value })));
+      }
+      await client.from('crew').upsert(visibleCrew().map(c => ({ id: c.id, captain_id: c.captainId, vessel_id: c.vesselId, name: c.name, dni: c.dni, phone: c.phone, vessel: c.vessel, role: c.role, active: c.active })));
+      const pending = visiblePayments().filter(p => !p.synced);
+      if (!pending.length) {
+        if (forceToast) toast(t('synced'));
+        return;
+      }
+      const payload = pending.map(p => ({
+        id: p.id, captain_id: p.captainId, vessel_id: p.vesselId, number: p.number, sailor_name: p.sailorName, dni: p.dni, vessel: p.vessel,
+        captain: p.captain, concept: p.concept, date: p.date, quantity: p.quantity,
+        price: p.price, total: p.total, notes: p.notes, photo: p.photo, signature: p.signature, created_at: p.createdAt
+      }));
+      const { error } = await client.from('payments').upsert(payload);
+      if (error) {
+        toast(error.message);
+        return;
+      }
+      pending.forEach(p => p.synced = true);
+      recordAudit('sync.payments', `${pending.length} ${t('receipts')}`);
+      persist();
+      if (forceToast) toast(t('synced'));
+    }
+    function updateSyncCount() {
+      document.getElementById('syncCount').textContent = visiblePayments().filter(p => !p.synced).length;
+    }
+    function updateNet() {
+      document.getElementById('netDot').classList.toggle('off', !navigator.onLine);
+      document.getElementById('netText').textContent = navigator.onLine ? t('connected') : t('offline');
+      if (navigator.onLine) syncSupabase();
+    }
+
+    function renderView() {
+      document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
+      document.getElementById('supabaseBtn').innerHTML = icon('settings') + t('configure');
+      document.getElementById('newPaymentTop').innerHTML = icon('plus') + t('newPayment');
+      document.getElementById('closeModal').innerHTML = icon('close');
+      if (state.view === 'dashboard') renderDashboard();
+      if (state.view === 'payments') renderPayments();
+      if (state.view === 'receipts') renderReceipts();
+      if (state.view === 'crew') renderCrew();
+      if (state.view === 'catalogs') renderCatalogs();
+      if (state.view === 'reports') renderReports();
+      if (state.view === 'settings') renderSettings();
+      updateNet();
+      updateSyncCount();
+    }
+
+    document.addEventListener('click', event => {
+      const goButton = event.target.closest('[data-go]');
+      if (goButton) go(goButton.dataset.go);
+    });
+    document.getElementById('langBtn').addEventListener('click', () => {
+      state.lang = state.lang === 'es' ? 'en' : 'es';
+      localStorage.setItem('cc_lang', state.lang);
+      go(state.view);
+    });
+    document.getElementById('supabaseBtn').addEventListener('click', () => go('settings'));
+    document.getElementById('closeModal').addEventListener('click', closeModal);
+    document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+    document.getElementById('gateLoginForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      setLoginMessage('');
+      const data = Object.fromEntries(new FormData(e.target));
+      await signInSupabase(data.email, data.password);
+    });
+    window.addEventListener('online', updateNet);
+    window.addEventListener('offline', updateNet);
+
+    setupSupabase();
+    updateAuthGate();
+    hydrateSession();
+    renderNav();
+    go('dashboard');
+  </script>
+</body>
+</html>
