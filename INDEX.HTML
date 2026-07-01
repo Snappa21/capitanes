@@ -403,7 +403,8 @@
       filter: '',
       reportFilter: {},
       supabase: null,
-      session: null
+      session: null,
+      realtimeChannel: null
     };
 
     function loadDb() {
@@ -931,6 +932,7 @@ create table vessels (id text primary key, captain_id text references captains(i
 create table crew (id text primary key, captain_id text references captains(id), vessel_id text references vessels(id), name text not null, dni text, phone text, vessel text, role text, active boolean default true);
 create table roles (value text primary key);
 create table concepts (value text primary key);
+create table admin_users (auth_user_id uuid primary key, name text);
 create table payments (
   id text primary key,
   captain_id text references captains(id),
@@ -956,6 +958,26 @@ alter table captains enable row level security;
 alter table vessels enable row level security;
 alter table crew enable row level security;
 alter table payments enable row level security;
+alter table admin_users enable row level security;
+
+create policy "admin sees own admin row" on admin_users
+  for select using (auth.uid() = auth_user_id);
+
+create policy "admins manage captains" on captains
+  for all using (exists (select 1 from admin_users where auth_user_id = auth.uid()))
+  with check (exists (select 1 from admin_users where auth_user_id = auth.uid()));
+
+create policy "admins manage vessels" on vessels
+  for all using (exists (select 1 from admin_users where auth_user_id = auth.uid()))
+  with check (exists (select 1 from admin_users where auth_user_id = auth.uid()));
+
+create policy "admins manage crew" on crew
+  for all using (exists (select 1 from admin_users where auth_user_id = auth.uid()))
+  with check (exists (select 1 from admin_users where auth_user_id = auth.uid()));
+
+create policy "admins manage payments" on payments
+  for all using (exists (select 1 from admin_users where auth_user_id = auth.uid()))
+  with check (exists (select 1 from admin_users where auth_user_id = auth.uid()));
 
 create policy "captain sees own profile" on captains
   for select using (auth.uid() = auth_user_id);
@@ -969,9 +991,7 @@ create policy "captain manages own crew" on crew
 
 create policy "captain manages own payments" on payments
   for all using (captain_id in (select id from captains where auth_user_id = auth.uid()))
-  with check (captain_id in (select id from captains where auth_user_id = auth.uid()));
-
--- Para administradores, crea una tabla admin_users o usa custom claims y agrega politicas separadas.`;
+  with check (captain_id in (select id from captains where auth_user_id = auth.uid()));`;
     }
 
     function openEntityModal(key) {
@@ -1059,10 +1079,20 @@ create policy "captain manages own payments" on payments
       const { data } = await client.auth.getSession();
       state.session = data.session;
       await applySessionScope();
+      await loadSupabaseData();
+      startRealtime();
     }
     async function applySessionScope() {
       const userId = state.session?.user?.id;
       if (!userId) return;
+      const client = state.supabase || setupSupabase();
+      if (!client) return;
+      const { data: adminRow } = await client.from('admin_users').select('*').eq('auth_user_id', userId).maybeSingle();
+      if (adminRow) {
+        state.config.role = 'Administrador';
+        localStorage.setItem('cc_config', JSON.stringify(state.config));
+        return;
+      }
       const captain = state.db.captains.find(c => c.authUserId === userId);
       if (captain) {
         state.config.role = 'Capitan';
@@ -1070,8 +1100,6 @@ create policy "captain manages own payments" on payments
         localStorage.setItem('cc_config', JSON.stringify(state.config));
         return;
       }
-      const client = state.supabase || setupSupabase();
-      if (!client) return;
       const { data, error } = await client.from('captains').select('*').eq('auth_user_id', userId).maybeSingle();
       if (!error && data) {
         const mapped = { id: data.id, authUserId: data.auth_user_id, name: data.name, phone: data.phone, email: data.email };
@@ -1084,6 +1112,84 @@ create policy "captain manages own payments" on payments
         persist();
       }
     }
+    async function loadSupabaseData() {
+      const client = state.supabase || setupSupabase();
+      if (!client || !state.session) return;
+      const [captainsRes, vesselsRes, crewRes, paymentsRes, rolesRes, conceptsRes] = await Promise.all([
+        client.from('captains').select('*'),
+        client.from('vessels').select('*'),
+        client.from('crew').select('*'),
+        client.from('payments').select('*').order('created_at', { ascending: false }),
+        client.from('roles').select('*'),
+        client.from('concepts').select('*')
+      ]);
+      if (!captainsRes.error && captainsRes.data?.length) {
+        state.db.captains = captainsRes.data.map(c => ({ id: c.id, authUserId: c.auth_user_id, name: c.name, phone: c.phone, email: c.email }));
+      }
+      if (!vesselsRes.error && vesselsRes.data?.length) {
+        state.db.vessels = vesselsRes.data.map(v => ({ id: v.id, captainId: v.captain_id, name: v.name, captain: v.captain, season: v.season }));
+      }
+      if (!crewRes.error && crewRes.data) {
+        state.db.crew = crewRes.data.map(mapCrewRow);
+      }
+      if (!paymentsRes.error && paymentsRes.data) {
+        state.db.payments = paymentsRes.data.map(mapPaymentRow);
+      }
+      if (!rolesRes.error && rolesRes.data?.length) state.db.roles = rolesRes.data.map(r => r.value);
+      if (!conceptsRes.error && conceptsRes.data?.length) state.db.concepts = conceptsRes.data.map(c => c.value);
+      persist();
+      renderView();
+    }
+    function mapCrewRow(c) {
+      return { id: c.id, captainId: c.captain_id, vesselId: c.vessel_id, name: c.name, dni: c.dni, phone: c.phone, vessel: c.vessel, role: c.role, active: c.active };
+    }
+    function mapPaymentRow(p) {
+      return {
+        id: p.id,
+        captainId: p.captain_id,
+        vesselId: p.vessel_id,
+        number: p.number,
+        sailorName: p.sailor_name,
+        dni: p.dni,
+        vessel: p.vessel,
+        captain: p.captain,
+        concept: p.concept,
+        date: p.date,
+        quantity: p.quantity,
+        price: p.price,
+        total: p.total,
+        notes: p.notes,
+        photo: p.photo,
+        signature: p.signature,
+        createdAt: p.created_at,
+        synced: true
+      };
+    }
+    function upsertById(list, item) {
+      const index = list.findIndex(row => row.id === item.id);
+      if (index >= 0) list[index] = { ...list[index], ...item };
+      else list.unshift(item);
+    }
+    function startRealtime() {
+      const client = state.supabase || setupSupabase();
+      if (!client || !state.session) return;
+      if (state.realtimeChannel) client.removeChannel(state.realtimeChannel);
+      state.realtimeChannel = client
+        .channel('capitan-control-live')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, payload => {
+          if (payload.eventType === 'DELETE') state.db.payments = state.db.payments.filter(p => p.id !== payload.old.id);
+          else upsertById(state.db.payments, mapPaymentRow(payload.new));
+          persist();
+          renderView();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'crew' }, payload => {
+          if (payload.eventType === 'DELETE') state.db.crew = state.db.crew.filter(c => c.id !== payload.old.id);
+          else upsertById(state.db.crew, mapCrewRow(payload.new));
+          persist();
+          renderView();
+        })
+        .subscribe();
+    }
     async function signInSupabase(email, password) {
       const client = state.supabase || setupSupabase();
       if (!client) return toast(state.lang === 'es' ? 'Configura Supabase primero' : 'Configure Supabase first');
@@ -1091,11 +1197,15 @@ create policy "captain manages own payments" on payments
       if (error) return toast(error.message);
       state.session = data.session;
       await applySessionScope();
+      await loadSupabaseData();
+      startRealtime();
       toast('Login OK');
       go('dashboard');
     }
     async function signOutSupabase() {
       const client = state.supabase || setupSupabase();
+      if (client && state.realtimeChannel) client.removeChannel(state.realtimeChannel);
+      state.realtimeChannel = null;
       if (client) await client.auth.signOut();
       state.session = null;
       toast('Sesion cerrada');
