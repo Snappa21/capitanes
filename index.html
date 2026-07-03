@@ -1,1377 +1,2333 @@
-<!doctype html>
-<html lang="es">
+﻿<!doctype html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#002856">
-  <title>Capitan Control</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cloud11 Store Management</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+  <link rel="manifest" href="./site.webmanifest">
+  <meta name="theme-color" content="#04050d">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
-      --navy: #002856;
-      --navy-2: #001b3d;
-      --blue: #0757b7;
-      --blue-soft: #eaf3ff;
-      --gold: #d9a441;
-      --green: #138a52;
-      --purple: #6f42c1;
-      --ink: #101828;
-      --muted: #667085;
-      --line: #e4e7ec;
-      --panel: #ffffff;
-      --bg: #f6f8fb;
-      --danger: #b42318;
-      --shadow: 0 12px 32px rgba(16, 24, 40, .08);
-      --radius: 8px;
+      color-scheme: dark;
+      --bg: #04050d;
+      --panel: rgba(15, 18, 35, .78);
+      --panel-strong: rgba(19, 22, 43, .94);
+      --line: rgba(255, 255, 255, .12);
+      --text: #f7fbff;
+      --muted: #9ea8c6;
+      --blue: #19d6ff;
+      --pink: #ff36d3;
+      --purple: #8d5cff;
+      --green: #36f5a2;
+      --yellow: #ffe36e;
+      --danger: #ff5d7a;
+      --shadow-blue: 0 0 24px rgba(25, 214, 255, .34);
+      --shadow-pink: 0 0 26px rgba(255, 54, 211, .3);
+      --radius: 18px;
+      --sidebar: 276px;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
     * { box-sizing: border-box; }
-    html { background: var(--bg); color: var(--ink); }
+
+    body:not(.authenticated) .app { display: none; }
+    body.authenticated .login-screen { display: none; }
+
     body {
       margin: 0;
       min-height: 100vh;
-      background: var(--bg);
-      font-size: 14px;
-      letter-spacing: 0;
+      background:
+        radial-gradient(circle at 18% 12%, rgba(25, 214, 255, .22), transparent 30%),
+        radial-gradient(circle at 85% 18%, rgba(255, 54, 211, .22), transparent 31%),
+        radial-gradient(circle at 62% 84%, rgba(141, 92, 255, .24), transparent 36%),
+        linear-gradient(135deg, #03040a 0%, #07091a 45%, #0c0617 100%);
+      color: var(--text);
+      overflow-x: hidden;
     }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,.9), transparent);
+    }
+
     button, input, select, textarea { font: inherit; }
     button { cursor: pointer; }
-    .app { min-height: 100vh; display: grid; grid-template-columns: 250px 1fr; }
+
+    .login-screen {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      padding: 22px;
+    }
+
+    .login-card {
+      width: min(1040px, 100%);
+      display: grid;
+      grid-template-columns: minmax(0, .95fr) minmax(360px, .72fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .login-hero {
+      min-height: 560px;
+      padding: 30px;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, rgba(4,5,13,.94), rgba(4,5,13,.5)),
+        radial-gradient(circle at 35% 28%, rgba(25,214,255,.42), transparent 34%),
+        radial-gradient(circle at 75% 64%, rgba(255,54,211,.38), transparent 36%);
+    }
+
+    .login-hero h1 {
+      margin: 28px 0 10px;
+      max-width: 520px;
+      font-size: clamp(44px, 6vw, 92px);
+      line-height: .9;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    .login-form {
+      padding: 24px;
+      align-self: center;
+    }
+
+    .login-form h2 {
+      font-size: 30px;
+      line-height: 1.05;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: var(--sidebar) minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
     .sidebar {
       position: sticky;
       top: 0;
-      height: 100vh;
-      padding: 24px 18px;
-      color: #fff;
-      background: linear-gradient(180deg, var(--navy), var(--navy-2));
       display: flex;
       flex-direction: column;
-      gap: 24px;
-    }
-    .brand { display: flex; align-items: center; gap: 12px; padding: 0 6px; }
-    .brand-mark {
-      width: 46px; height: 46px; border: 2px solid rgba(255,255,255,.9);
-      border-radius: 50%; display: grid; place-items: center; font-size: 26px; font-weight: 800;
-    }
-    .brand-title { font-size: 18px; font-weight: 800; line-height: 1.05; text-transform: uppercase; }
-    .brand-sub { font-size: 10px; color: rgba(255,255,255,.7); margin-top: 3px; }
-    .nav { display: grid; gap: 6px; }
-    .nav button {
-      height: 46px;
-      border: 0;
-      border-radius: var(--radius);
-      color: rgba(255,255,255,.85);
-      background: transparent;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 0 12px;
-      text-align: left;
-    }
-    .nav button svg, .icon svg { width: 18px; height: 18px; stroke-width: 2; }
-    .nav button.active { background: var(--blue); color: #fff; box-shadow: 0 8px 24px rgba(7,87,183,.35); }
-    .side-foot {
-      margin-top: auto;
-      display: grid;
-      gap: 10px;
-      padding-top: 14px;
-      border-top: 1px solid rgba(255,255,255,.12);
-      color: rgba(255,255,255,.85);
-    }
-    .status-pill {
-      display: inline-flex; align-items: center; gap: 8px;
-      width: fit-content; min-height: 30px; padding: 6px 10px;
-      border-radius: 999px; background: rgba(255,255,255,.1); font-size: 12px;
-    }
-    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); }
-    .dot.off { background: var(--gold); }
-    .main { min-width: 0; padding: 30px 28px 92px; }
-    .topbar { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 24px; }
-    h1 { margin: 0 0 8px; font-size: 28px; line-height: 1.12; }
-    h2 { margin: 0 0 6px; font-size: 19px; }
-    h3 { margin: 0; font-size: 16px; }
-    p { margin: 0; color: var(--muted); }
-    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
-    .btn, .chip, .input, select, textarea {
-      min-height: 42px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: #fff;
-      color: var(--ink);
-    }
-    .btn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-      padding: 0 14px;
-      font-weight: 700;
-    }
-    .btn.primary { background: var(--navy); color: #fff; border-color: var(--navy); }
-    .btn.blue { background: var(--blue); color: #fff; border-color: var(--blue); }
-    .btn.ghost { background: transparent; }
-    .btn.danger { color: var(--danger); border-color: #f4c7c3; background: #fff7f6; }
-    .btn.icon-only { width: 42px; padding: 0; }
-    .grid { display: grid; gap: 18px; }
-    .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 22px; }
-    .stat, .panel, .quick {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-    }
-    .stat { padding: 20px; display: grid; gap: 12px; min-height: 140px; }
-    .stat-head { display: flex; align-items: center; gap: 12px; color: var(--muted); }
-    .bubble { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; }
-    .bubble.blue { color: var(--blue); background: var(--blue-soft); }
-    .bubble.green { color: var(--green); background: #eaf8f0; }
-    .bubble.gold { color: #a66b00; background: #fff4dc; }
-    .bubble.purple { color: var(--purple); background: #f3eaff; }
-    .stat strong { font-size: 26px; color: var(--navy); }
-    .content-grid { grid-template-columns: minmax(310px, .88fr) minmax(360px, 1.12fr); align-items: start; }
-    .panel { padding: 20px; min-width: 0; }
-    .form { display: grid; gap: 14px; margin-top: 18px; }
-    .field { display: grid; gap: 7px; min-width: 0; }
-    label { font-size: 13px; font-weight: 750; color: #182230; }
-    input, select, textarea {
-      width: 100%;
-      padding: 0 12px;
-      outline: 0;
-      color: var(--ink);
-    }
-    textarea { min-height: 84px; padding-top: 11px; resize: vertical; }
-    input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(7,87,183,.12); }
-    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .actions { display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; }
-    .receipt {
-      margin-top: 18px;
-      background: #fff;
-      border: 1px solid #1d2939;
-      min-height: 610px;
-      padding: 34px 28px;
-      font-family: Georgia, "Times New Roman", serif;
-      color: #101828;
-      line-height: 1.65;
-    }
-    .receipt h3 { text-align: center; font-size: 17px; margin-bottom: 22px; font-family: inherit; }
-    .receipt .line { border-bottom: 1px solid #344054; display: inline-block; min-width: 120px; text-align: center; font-weight: 700; }
-    .receipt .sign { width: 220px; border-top: 1px solid #344054; text-align: center; margin: 56px auto 0; padding-top: 4px; }
-    .receipt-photo { max-width: 120px; max-height: 80px; display: block; margin-top: 8px; border: 1px solid var(--line); }
-    .receipt-signature { max-width: 220px; max-height: 70px; display: block; margin: 36px auto 0; }
-    .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); margin-top: 16px; }
-    table { width: 100%; border-collapse: collapse; min-width: 760px; background: #fff; }
-    th, td { padding: 13px 14px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
-    th { color: #344054; background: #f9fafb; font-size: 12px; text-transform: uppercase; letter-spacing: .02em; }
-    tr:last-child td { border-bottom: 0; }
-    .avatar {
-      width: 32px; height: 32px; border-radius: 50%; background: var(--blue-soft);
-      color: var(--navy); display: inline-grid; place-items: center; font-weight: 800; margin-right: 8px;
-    }
-    .section { display: none; }
-    .section.active { display: block; }
-    .quick-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 22px; }
-    .quick { padding: 16px; display: flex; align-items: center; gap: 12px; min-height: 74px; border: 0; text-align: left; }
-    .quick span { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
-    .search-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-top: 14px; }
-    .search-row .input { max-width: 310px; padding-left: 12px; }
-    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 6px; }
-    .chip { padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; font-weight: 750; }
-    .chip.active { background: var(--blue-soft); border-color: #bdd7ff; color: var(--blue); }
-    .drawer {
-      position: fixed; inset: 0; z-index: 30; display: none; align-items: flex-end; background: rgba(0,0,0,.28);
-    }
-    .drawer.open { display: flex; }
-    .modal {
-      width: min(720px, calc(100vw - 28px)); max-height: min(86vh, 760px); overflow: auto;
-      margin: auto; background: #fff; border-radius: var(--radius); padding: 22px; box-shadow: 0 24px 80px rgba(0,0,0,.22);
-    }
-    .toast {
-      position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
-      background: var(--navy); color: #fff; border-radius: var(--radius); padding: 12px 14px;
-      box-shadow: var(--shadow); display: none; z-index: 40; max-width: calc(100vw - 28px);
-    }
-    .toast.show { display: block; }
-    .login-gate {
-      position: fixed;
-      inset: 0;
-      z-index: 100;
-      min-height: 100vh;
-      padding: 22px;
-      display: grid;
-      place-items: center;
-      background: linear-gradient(180deg, var(--navy), var(--navy-2));
-      color: #fff;
-    }
-    .login-gate.hidden { display: none; }
-    .login-card {
-      width: min(430px, 100%);
-      background: #fff;
-      color: var(--ink);
-      border-radius: var(--radius);
-      box-shadow: 0 24px 80px rgba(0,0,0,.24);
-      padding: 24px;
-    }
-    .login-card .brand { color: var(--navy); padding: 0; margin-bottom: 22px; }
-    .login-card .brand-mark { border-color: var(--navy); }
-    .login-card .brand-sub { color: var(--muted); }
-    .login-status { min-height: 20px; margin-top: 10px; color: var(--danger); font-weight: 700; }
-    .mobile-nav {
-      position: fixed; left: 0; right: 0; bottom: 0; display: none; z-index: 20;
-      background: #fff; border-top: 1px solid var(--line); padding: 8px max(10px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-right));
-    }
-    .mobile-nav button {
-      border: 0; background: transparent; color: var(--muted); display: grid; justify-items: center; gap: 4px; font-size: 10px;
-    }
-    .mobile-nav button.active { color: var(--blue); }
-    .chart { width: 100%; height: 240px; display: block; margin-top: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
-    .note { padding: 12px; border-radius: var(--radius); background: var(--blue-soft); color: #194185; margin-top: 14px; }
-    .schema {
-      white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; background: #0b1220;
-      color: #d8e7ff; padding: 14px; border-radius: var(--radius); overflow: auto; font-size: 12px;
-    }
-    .signature-pad {
-      width: 100%;
-      height: 150px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: #fff;
-      touch-action: none;
-      display: block;
+      gap: 18px;
+      height: 100vh;
+      padding: 22px 18px;
+      border-right: 1px solid var(--line);
+      background: rgba(3, 5, 14, .82);
+      backdrop-filter: blur(24px);
+      z-index: 10;
     }
 
-    @media (max-width: 1100px) {
+    .brand {
+      display: grid;
+      grid-template-columns: 58px 1fr;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid rgba(25, 214, 255, .26);
+      border-radius: 20px;
+      background: linear-gradient(135deg, rgba(25,214,255,.11), rgba(255,54,211,.1));
+      box-shadow: var(--shadow-blue);
+    }
+
+    .cloud-logo {
+      position: relative;
+      width: 58px;
+      height: 38px;
+      border: 3px solid var(--blue);
+      border-radius: 24px;
+      box-shadow: 0 0 14px var(--blue), inset 0 0 12px rgba(25,214,255,.24);
+    }
+
+    .cloud-logo::before,
+    .cloud-logo::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      background: #080b19;
+      border: 3px solid;
+      border-bottom-color: transparent;
+      box-shadow: 0 0 14px currentColor;
+    }
+
+    .cloud-logo::before {
+      width: 28px;
+      height: 28px;
+      left: 8px;
+      top: -17px;
+      color: var(--blue);
+      border-color: var(--blue);
+      border-bottom-color: transparent;
+    }
+
+    .cloud-logo::after {
+      width: 24px;
+      height: 24px;
+      right: 5px;
+      top: -11px;
+      color: var(--pink);
+      border-color: var(--pink);
+      border-bottom-color: transparent;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 21px;
+      letter-spacing: 0;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+
+    .brand span {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .nav {
+      display: grid;
+      gap: 7px;
+      min-height: 0;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .nav button {
+      display: grid;
+      grid-template-columns: 24px 1fr auto;
+      align-items: center;
+      gap: 11px;
+      width: 100%;
+      min-height: 44px;
+      border: 1px solid transparent;
+      border-radius: 14px;
+      color: var(--muted);
+      background: transparent;
+      text-align: left;
+      transition: .18s ease;
+    }
+
+    .nav button:hover,
+    .nav button.active {
+      color: var(--text);
+      border-color: rgba(25, 214, 255, .28);
+      background: linear-gradient(90deg, rgba(25,214,255,.13), rgba(255,54,211,.08));
+      box-shadow: 0 0 18px rgba(25, 214, 255, .14);
+    }
+
+    .nav .icon {
+      display: grid;
+      place-items: center;
+      color: var(--blue);
+      font-size: 18px;
+    }
+
+    .count {
+      min-width: 26px;
+      padding: 3px 7px;
+      border-radius: 999px;
+      color: #05101a;
+      background: linear-gradient(135deg, var(--blue), var(--pink));
+      font-size: 11px;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,.05);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      flex: 0 0 auto;
+    }
+
+    main {
+      min-width: 0;
+      padding: 22px;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 8;
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto auto;
+      gap: 14px;
+      align-items: center;
+      margin: -22px -22px 22px;
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(4, 5, 13, .75);
+      backdrop-filter: blur(22px);
+    }
+
+    .search {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 44px;
+      max-width: 620px;
+      min-width: 0;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,.055);
+    }
+
+    .search input {
+      width: 100%;
+      border: 0;
+      outline: 0;
+      color: var(--text);
+      background: transparent;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 38px;
+      padding: 0 12px;
+      border: 1px solid rgba(54, 245, 162, .3);
+      border-radius: 999px;
+      color: var(--green);
+      background: rgba(54, 245, 162, .08);
+      white-space: nowrap;
+      max-width: 220px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 14px currentColor;
+    }
+
+    .user-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 44px;
+      padding: 0 12px 0 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,.055);
+      white-space: nowrap;
+      max-width: 260px;
+      min-width: 0;
+    }
+
+    .user-chip strong {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .avatar {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      color: #06101c;
+      background: linear-gradient(135deg, var(--blue), var(--pink));
+      font-weight: 1000;
+    }
+
+    .section {
+      display: none;
+      animation: rise .24s ease both;
+    }
+
+    .section.active { display: block; }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .page-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 18px;
+    }
+
+    .eyebrow {
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      margin: 4px 0 0;
+      font-size: clamp(28px, 4vw, 46px);
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+
+    .sub {
+      margin: 7px 0 0;
+      color: var(--muted);
+      max-width: 760px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      color: var(--text);
+      background: rgba(255,255,255,.065);
+      transition: .18s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      border-color: rgba(25,214,255,.35);
+      box-shadow: var(--shadow-blue);
+    }
+
+    .btn.primary {
+      border-color: transparent;
+      color: #031020;
+      background: linear-gradient(135deg, var(--blue), var(--pink));
+      font-weight: 900;
+      box-shadow: var(--shadow-pink);
+    }
+
+    .btn.danger {
+      border-color: rgba(255,93,122,.35);
+      color: #ffd9df;
+      background: rgba(255,93,122,.1);
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .grid.kpi {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .grid.two { grid-template-columns: minmax(0, 1.12fr) minmax(330px, .88fr); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(145deg, rgba(255,255,255,.095), rgba(255,255,255,.04));
+      box-shadow: 0 18px 58px rgba(0,0,0,.34);
+      backdrop-filter: blur(22px);
+    }
+
+    .card.pad { padding: 18px; }
+
+    .kpi-card {
+      position: relative;
+      min-height: 134px;
+      padding: 18px;
+      overflow: hidden;
+    }
+
+    .kpi-card::after {
+      content: "";
+      position: absolute;
+      width: 130px;
+      height: 130px;
+      right: -48px;
+      bottom: -62px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,.14);
+      box-shadow: inset 0 0 28px rgba(25,214,255,.16);
+    }
+
+    .kpi-label { color: var(--muted); font-size: 13px; }
+    .kpi-value { margin-top: 9px; font-size: 30px; font-weight: 1000; }
+    .kpi-note { margin-top: 8px; color: var(--green); font-size: 13px; font-weight: 800; }
+
+    .hero {
+      position: relative;
+      min-height: 314px;
+      overflow: hidden;
+      padding: 24px;
+      border: 1px solid rgba(25,214,255,.2);
+      background:
+        linear-gradient(90deg, rgba(4,5,13,.92), rgba(4,5,13,.55)),
+        radial-gradient(circle at 68% 34%, rgba(255,54,211,.34), transparent 35%),
+        radial-gradient(circle at 82% 72%, rgba(25,214,255,.32), transparent 31%);
+    }
+
+    .hero h3 {
+      max-width: 600px;
+      margin: 22px 0 8px;
+      font-size: clamp(34px, 5vw, 76px);
+      line-height: .92;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .script {
+      display: block;
+      color: var(--pink);
+      font-family: "Segoe Script", "Brush Script MT", cursive;
+      text-transform: none;
+      font-size: .62em;
+      text-shadow: 0 0 18px var(--pink);
+    }
+
+    .hero-icons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .mini {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 11px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 999px;
+      color: var(--text);
+      background: rgba(255,255,255,.06);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .panel-head h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th, td {
+      padding: 13px 12px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    tr:hover td { background: rgba(255,255,255,.035); }
+
+    .table-wrap {
+      overflow: auto;
+      border-radius: 14px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 0 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.12);
+      color: var(--text);
+      background: rgba(255,255,255,.06);
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .badge.blue { color: var(--blue); border-color: rgba(25,214,255,.35); background: rgba(25,214,255,.08); }
+    .badge.pink { color: var(--pink); border-color: rgba(255,54,211,.35); background: rgba(255,54,211,.08); }
+    .badge.green { color: var(--green); border-color: rgba(54,245,162,.3); background: rgba(54,245,162,.08); }
+    .badge.yellow { color: var(--yellow); border-color: rgba(255,227,110,.3); background: rgba(255,227,110,.08); }
+    .badge.red { color: var(--danger); border-color: rgba(255,93,122,.32); background: rgba(255,93,122,.08); }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .field.full { grid-column: 1 / -1; }
+
+    label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      color: var(--text);
+      background: rgba(5, 8, 19, .8);
+      outline: 0;
+      padding: 0 12px;
+    }
+
+    textarea {
+      min-height: 94px;
+      padding: 12px;
+      resize: vertical;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: rgba(25,214,255,.55);
+      box-shadow: 0 0 0 4px rgba(25,214,255,.08);
+    }
+
+    .product-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(210px, 1fr));
+      gap: 14px;
+    }
+
+    .product {
+      overflow: hidden;
+      transition: .18s ease;
+    }
+
+    .product:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255,54,211,.26);
+      box-shadow: var(--shadow-pink);
+    }
+
+    .product-art {
+      display: grid;
+      place-items: center;
+      min-height: 128px;
+      background:
+        radial-gradient(circle at 35% 25%, rgba(25,214,255,.38), transparent 38%),
+        radial-gradient(circle at 72% 62%, rgba(255,54,211,.34), transparent 36%),
+        linear-gradient(135deg, rgba(255,255,255,.07), rgba(255,255,255,.02));
+      font-size: 48px;
+    }
+
+    .product-body { padding: 14px; }
+    .product h3 { margin: 0; font-size: 16px; }
+    .product p { min-height: 40px; margin: 8px 0 12px; color: var(--muted); font-size: 13px; }
+
+    .product-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .price {
+      color: var(--blue);
+      font-size: 20px;
+      font-weight: 1000;
+    }
+
+    .pos-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 390px;
+      gap: 16px;
+    }
+
+    .pos-products {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .pos-item {
+      display: grid;
+      gap: 8px;
+      min-height: 126px;
+      padding: 14px;
+      text-align: left;
+    }
+
+    .cart-line {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+
+    .cart-total {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+    }
+
+    .total-row strong {
+      color: var(--text);
+      font-size: 24px;
+    }
+
+    .scan-panel {
+      display: grid;
+      grid-template-columns: minmax(240px, 1fr) auto;
+      gap: 12px;
+      align-items: end;
+      margin-bottom: 16px;
+      padding: 14px;
+      border: 1px solid rgba(25,214,255,.2);
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(25,214,255,.08), rgba(255,54,211,.07));
+    }
+
+    .scan-panel .form-grid {
+      grid-template-columns: 1.4fr .7fr;
+      width: 100%;
+    }
+
+    .scanner-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: none;
+      place-items: center;
+      padding: 18px;
+      background: rgba(2, 4, 12, .76);
+      backdrop-filter: blur(14px);
+    }
+
+    .scanner-modal.show { display: grid; }
+
+    .scanner-box {
+      width: min(760px, 100%);
+      padding: 16px;
+    }
+
+    .scanner-frame {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(25,214,255,.35);
+      border-radius: 18px;
+      background: #000;
+      aspect-ratio: 16 / 10;
+      box-shadow: var(--shadow-blue);
+    }
+
+    .scanner-frame video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .scanner-line {
+      position: absolute;
+      left: 10%;
+      right: 10%;
+      top: 50%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--blue), var(--pink), transparent);
+      box-shadow: 0 0 18px var(--blue);
+      animation: scanline 1.6s ease-in-out infinite;
+    }
+
+    @keyframes scanline {
+      0%, 100% { transform: translateY(-70px); }
+      50% { transform: translateY(70px); }
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 45;
+      display: none;
+      place-items: center;
+      padding: 18px;
+      background: rgba(2, 4, 12, .74);
+      backdrop-filter: blur(14px);
+    }
+
+    .modal.show { display: grid; }
+
+    .modal-card {
+      width: min(760px, 100%);
+      max-height: min(86vh, 820px);
+      overflow: auto;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 12px;
+    }
+
+    .activity {
+      display: grid;
+      grid-template-columns: 40px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 14px;
+      background: rgba(255,255,255,.04);
+    }
+
+    .activity .bubble {
+      display: grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 13px;
+      background: linear-gradient(135deg, rgba(25,214,255,.22), rgba(255,54,211,.2));
+      color: var(--blue);
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 40;
+      display: none;
+      max-width: 360px;
+      padding: 14px 16px;
+      border: 1px solid rgba(25,214,255,.35);
+      border-radius: 16px;
+      background: rgba(7, 10, 23, .92);
+      box-shadow: var(--shadow-blue);
+      backdrop-filter: blur(20px);
+    }
+
+    .toast.show { display: block; animation: rise .18s ease both; }
+
+    .mobile-menu { display: none; }
+
+    @media (max-width: 1180px) {
+      .grid.kpi, .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid.two, .pos-layout { grid-template-columns: 1fr; }
+      .pos-products { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 820px) {
+      .login-card { grid-template-columns: 1fr; }
+      .login-hero { min-height: 300px; }
       .app { grid-template-columns: 1fr; }
-      .sidebar { display: none; }
-      .mobile-nav { display: grid; grid-template-columns: repeat(5, 1fr); }
-      .main { padding: 22px 14px 92px; }
-      .stats, .quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .content-grid { grid-template-columns: 1fr; }
-      .topbar { align-items: stretch; flex-direction: column; }
-      .toolbar { justify-content: flex-start; }
+      .sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: min(86vw, 320px);
+        transform: translateX(-105%);
+        transition: transform .22s ease;
+      }
+      body.nav-open .sidebar { transform: translateX(0); }
+      .mobile-menu { display: inline-flex; }
+      main { padding: 16px; }
+      .topbar {
+        grid-template-columns: auto 1fr;
+        margin: -16px -16px 16px;
+        padding: 12px 16px;
+      }
+      .topbar .status-pill,
+      .topbar .user-chip { display: none; }
+      .page-head { display: grid; }
+      .actions { justify-content: flex-start; }
+      .grid.kpi, .grid.three, .product-grid, .pos-products, .form-grid { grid-template-columns: 1fr; }
+      .scan-panel, .scan-panel .form-grid { grid-template-columns: 1fr; }
+      .hero { min-height: 280px; }
+      .hero h3 { font-size: 42px; }
+      .sidebar-footer { margin-top: auto; }
     }
-    @media (max-width: 620px) {
-      h1 { font-size: 23px; }
-      .stats, .quick-grid, .two { grid-template-columns: 1fr; }
-      .panel { padding: 16px; }
-      .receipt { min-height: 520px; padding: 24px 18px; font-size: 13px; }
-      .actions, .search-row { align-items: stretch; flex-direction: column; }
-      .search-row .input, .btn { width: 100%; }
-      .btn.icon-only { width: 42px; }
-    }
-    @media print {
-      body * { visibility: hidden; }
-      .receipt, .receipt * { visibility: visible; }
-      .receipt { position: absolute; inset: 0; border: 0; min-height: auto; box-shadow: none; }
-      .mobile-nav, .sidebar, .topbar, .actions, .note { display: none !important; }
-    }
-  </style>
+</style>
 </head>
 <body>
-  <div class="login-gate" id="loginGate">
+  <section class="login-screen">
     <div class="login-card">
-      <div class="brand">
-        <div class="brand-mark">⚓</div>
-        <div>
-          <div class="brand-title">Capitan<br>Control</div>
-          <div class="brand-sub">Control de dinero a bordo</div>
+      <div class="card login-hero">
+        <div class="brand" style="width:min(320px,100%)">
+          <div class="cloud-logo" aria-hidden="true"></div>
+          <div>
+            <h1>Cloud11</h1>
+            <span>Secure Store Management</span>
+          </div>
+        </div>
+        <h1>Elevate <span class="script">Your Cloud</span></h1>
+        <p class="sub">Sign in to manage barcode inventory, POS sales, credits, customers, suppliers, reports, and live Supabase data.</p>
+        <div class="hero-icons">
+          <span class="mini">Secure Auth</span>
+          <span class="mini">Realtime</span>
+          <span class="mini">Barcode Ready</span>
+          <span class="mini">Audit Trail</span>
         </div>
       </div>
-      <form class="form" id="gateLoginForm">
-        <div class="field"><label>Correo</label><input name="email" type="email" autocomplete="username" required></div>
-        <div class="field"><label>Password</label><input name="password" type="password" autocomplete="current-password" required></div>
-        <button class="btn primary" style="width:100%">Login</button>
-        <div class="login-status" id="loginStatus"></div>
-      </form>
+      <div class="card login-form">
+        <div class="eyebrow">Cloud11 Access</div>
+        <h2 id="authTitle">Log in</h2>
+        <p class="sub" id="authSubtitle">Use the staff accounts you create in Supabase Auth for you and your brother.</p>
+        <form class="form-grid" id="authForm">
+          <div class="field full"><label>Email</label><input id="authEmail" type="email" autocomplete="email" required></div>
+          <div class="field full"><label>Password</label><input id="authPassword" type="password" autocomplete="current-password" required minlength="6"></div>
+          <div class="field full"><button class="btn primary" id="authSubmit" type="submit">Log In</button></div>
+        </form>
+        <p class="sub" id="authMessage">Use the two Supabase Auth users created for Cloud11.</p>
+      </div>
     </div>
-  </div>
+  </section>
 
   <div class="app">
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-mark">⚓</div>
+        <div class="cloud-logo" aria-hidden="true"></div>
         <div>
-          <div class="brand-title">Capitan<br>Control</div>
-          <div class="brand-sub" data-i18n="brandSub">Control de dinero a bordo</div>
+          <h1>Cloud11</h1>
+          <span>Premium Vapes & Accessories</span>
         </div>
       </div>
-      <nav class="nav" id="sideNav"></nav>
-      <div class="side-foot">
-        <div class="status-pill"><span class="dot" id="netDot"></span><span id="netText">Online</span></div>
-        <div class="status-pill"><span id="syncCount">0</span><span data-i18n="pendingSync">pendientes de sincronizar</span></div>
+      <nav class="nav" id="nav"></nav>
+      <div class="sidebar-footer">
+        Fast delivery across Guanaja. Quality, variety, satisfaction, and a clean operating system for every order.
       </div>
     </aside>
 
-    <main class="main">
-      <div class="topbar">
-        <div>
-          <h1 id="pageTitle"></h1>
-          <p id="pageSub"></p>
+    <main>
+      <header class="topbar">
+        <button class="btn mobile-menu" id="menuBtn" aria-label="Open navigation">Menu</button>
+        <div class="search">
+          <span>Search</span>
+          <input id="globalSearch" type="search" aria-label="Search products customers invoices suppliers">
         </div>
-        <div class="toolbar">
-          <button class="btn" id="langBtn" title="Cambiar idioma">ES / EN</button>
-          <button class="btn" id="supabaseBtn" title="Configurar Supabase"></button>
-          <button class="btn primary" data-go="payments" id="newPaymentTop"></button>
-        </div>
-      </div>
+        <div class="status-pill" id="dbStatus"><span class="dot"></span><span>Connecting</span></div>
+        <button class="user-chip" data-action="signOut" title="Sign out"><span class="avatar" id="userAvatar">C11</span><strong id="welcomeUser">Welcome</strong></button>
+      </header>
 
-      <section class="section active" id="dashboard"></section>
-      <section class="section" id="payments"></section>
-      <section class="section" id="receipts"></section>
-      <section class="section" id="crew"></section>
-      <section class="section" id="catalogs"></section>
-      <section class="section" id="reports"></section>
-      <section class="section" id="settings"></section>
+      <section class="section active" data-page="dashboard">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Command Center</div>
+            <h2>Elevate your cloud.</h2>
+            <p class="sub">Live inventory, sales, credits, suppliers, and activity in one polished internal system.</p>
+          </div>
+          <div class="actions">
+            <button class="btn primary" data-jump="sales">Open POS</button>
+          </div>
+        </div>
+        <div class="grid kpi" id="kpis"></div>
+        <div class="grid two" style="margin-top:16px">
+          <div class="card hero">
+            <div class="eyebrow">Now Open In Guanaja</div>
+            <h3>Premium vapes <span class="script">Fast Delivery</span></h3>
+            <p class="sub">Disposables, pod systems, e-liquids, accessories, local delivery, same-day delivery when available, and discreet reliable service.</p>
+            <div class="hero-icons">
+              <span class="mini">Disposables</span>
+              <span class="mini">Pod Systems</span>
+              <span class="mini">E-Liquids</span>
+              <span class="mini">Accessories</span>
+            </div>
+          </div>
+          <div class="card pad">
+            <div class="panel-head"><h3>Recent Activity</h3><button class="btn" data-jump="activity">View All</button></div>
+            <div class="timeline" id="recentActivity"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" data-page="products">
+        <div class="page-head">
+          <div><div class="eyebrow">Catalog</div><h2>Products</h2><p class="sub">Manage disposables, pod systems, e-liquids, and accessories with normalized product records and images.</p></div>
+          <div class="actions"><button class="btn primary" data-action="addProduct">Add Product</button></div>
+        </div>
+        <div class="scan-panel card">
+          <div class="form-grid">
+            <div class="field"><label>Category Filter</label><select id="categoryFilter"></select></div>
+            <div class="field"><label>Sort Products</label><select id="productSort"><option value="name">Name</option><option value="stock_low">Low Stock First</option><option value="price_high">Price High</option><option value="price_low">Price Low</option></select></div>
+          </div>
+          <div class="actions"><button class="btn" data-camera-mode="lookup">Scan Lookup</button></div>
+        </div>
+        <div class="product-grid" id="productGrid"></div>
+      </section>
+
+      <section class="section" data-page="inventory">
+        <div class="page-head">
+          <div><div class="eyebrow">Stock Control</div><h2>Inventory</h2><p class="sub">Track stock, reorder points, cost, retail price, and inventory movement history.</p></div>
+          <div class="actions"><button class="btn primary" data-action="receiveStock">Receive Stock</button></div>
+        </div>
+        <div class="scan-panel card">
+          <div class="form-grid">
+            <div class="field"><label>Scan Barcode To Receive</label><input id="receiveBarcode" inputmode="numeric" autocomplete="off" aria-label="Receive stock barcode"></div>
+            <div class="field"><label>Quantity</label><input id="receiveQty" type="number" min="1" value="1"></div>
+          </div>
+          <div class="actions">
+            <button class="btn" data-camera-mode="receive">Use Camera</button>
+            <button class="btn primary" data-action="receiveBarcode">Receive</button>
+          </div>
+        </div>
+        <div class="card pad table-wrap"><table id="inventoryTable"></table></div>
+        <div class="card pad table-wrap" style="margin-top:16px">
+          <div class="panel-head">
+            <h3>Faulty Product Returns</h3>
+            <button class="btn primary" data-action="openFaultyReturn">Report Faulty Vape</button>
+          </div>
+          <table id="faultyReturnsTable"></table>
+        </div>
+      </section>
+
+      <section class="section" data-page="sales">
+        <div class="page-head">
+          <div><div class="eyebrow">Point Of Sale</div><h2>POS</h2><p class="sub">Build a cart, choose customer and payment type, complete sale, or open customer credit.</p></div>
+        </div>
+        <div class="scan-panel card">
+          <div class="field"><label>Scan Barcode To Sell</label><input id="saleBarcode" inputmode="numeric" autocomplete="off" aria-label="Sale barcode scan"></div>
+          <div class="actions">
+            <button class="btn" data-camera-mode="sale">Use Camera</button>
+            <button class="btn primary" data-action="saleBarcode">Add To Cart</button>
+          </div>
+        </div>
+        <div class="pos-layout">
+          <div class="card pad">
+            <div class="panel-head"><h3>Tap Products</h3><span class="badge blue" id="posProductCount">0 products</span></div>
+            <div class="pos-products" id="posProducts"></div>
+          </div>
+          <div class="card pad">
+            <div class="panel-head"><h3>Cart</h3><button class="btn danger" data-action="clearCart">Clear</button></div>
+            <div class="form-grid">
+              <div class="field full"><label>Customer</label><select id="saleCustomer"></select></div>
+              <div class="field"><label>Payment</label><select id="paymentType"><option>cash</option><option>card</option><option>transfer</option><option>credit</option></select></div>
+              <div class="field"><label>Discount</label><input id="saleDiscount" type="number" value="0" min="0" step="1"></div>
+            </div>
+            <div id="cartLines" style="margin-top:14px"></div>
+            <div class="cart-total" id="cartTotals"></div>
+            <button class="btn primary" style="width:100%; margin-top:14px" data-action="checkout">Complete Sale</button>
+          </div>
+        </div>
+        <div class="card pad table-wrap" style="margin-top:16px">
+          <div class="panel-head"><h3>Sales History</h3><span class="badge blue" id="salesHistoryCount">0 sales</span></div>
+          <table id="salesHistoryTable"></table>
+        </div>
+      </section>
+
+      <section class="section" data-page="credits">
+        <div class="page-head">
+          <div><div class="eyebrow">Receivables</div><h2>Credits</h2><p class="sub">Monitor customer balances, payment plans, due dates, and partial payments.</p></div>
+          <div class="actions"><button class="btn primary" data-action="recordPayment">Record Payment</button></div>
+        </div>
+        <div class="card pad table-wrap"><table id="creditsTable"></table></div>
+      </section>
+
+      <section class="section" data-page="customers">
+        <div class="page-head">
+          <div><div class="eyebrow">Relationships</div><h2>Customers</h2><p class="sub">Customer profiles, delivery notes, credit limits, and lifetime value.</p></div>
+          <div class="actions"><button class="btn primary" data-action="addCustomer">Add Customer</button></div>
+        </div>
+        <div class="grid two">
+          <div class="card pad table-wrap"><table id="customersTable"></table></div>
+          <div class="card pad">
+            <h3 style="margin-top:0">Customer Form</h3>
+            <form class="form-grid" id="customerForm">
+              <div class="field"><label>Name</label><input name="name" required value="Walk-in Customer"></div>
+              <div class="field"><label>Phone</label><input name="phone" value="+504 0000-0000"></div>
+              <div class="field full"><label>Delivery Address</label><input name="address" value="Guanaja, Bay Islands"></div>
+              <div class="field"><label>Credit Limit</label><input name="credit_limit" type="number" value="2000"></div>
+              <div class="field"><label>Status</label><select name="status"><option>active</option><option>paused</option></select></div>
+              <div class="field full"><button class="btn primary" type="submit">Save Customer</button></div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" data-page="suppliers">
+        <div class="page-head">
+          <div><div class="eyebrow">Procurement</div><h2>Suppliers</h2><p class="sub">Supplier contacts, purchase orders, lead times, and product sourcing.</p></div>
+          <div class="actions"><button class="btn primary" data-action="addSupplier">Add Supplier</button></div>
+        </div>
+        <div class="card pad table-wrap"><table id="suppliersTable"></table></div>
+      </section>
+
+      <section class="section" data-page="reports">
+        <div class="page-head">
+          <div><div class="eyebrow">Insights</div><h2>Reports</h2><p class="sub">Sales, margin, inventory exposure, credit risk, and customer performance.</p></div>
+        </div>
+        <div class="scan-panel card">
+          <div class="form-grid">
+            <div class="field"><label>Report Range</label><select id="reportMode"><option value="week">This Week</option><option value="month">This Month</option><option value="custom">Selected Dates</option><option value="all">All Active Sales</option></select></div>
+            <div class="field"><label>Start Date</label><input id="reportStart" type="date"></div>
+            <div class="field"><label>End Date</label><input id="reportEnd" type="date"></div>
+          </div>
+          <div class="actions"><button class="btn primary" data-action="applyReportRange">Apply</button></div>
+        </div>
+        <div class="grid three" id="reportsGrid"></div>
+      </section>
+
+      <section class="section" data-page="activity">
+        <div class="page-head">
+          <div><div class="eyebrow">Audit Trail</div><h2>Activity Log</h2><p class="sub">Operational actions prepared for Supabase realtime and role-aware auditing.</p></div>
+        </div>
+        <div class="card pad"><div class="timeline" id="activityLog"></div></div>
+        <div class="card pad table-wrap" style="margin-top:16px">
+          <div class="panel-head"><h3>Scan History</h3><span class="badge blue">Inventory + Sales</span></div>
+          <table id="scanHistoryTable"></table>
+        </div>
+      </section>
+
+      <section class="section" data-page="settings">
+        <div class="page-head">
+          <div><div class="eyebrow">System</div><h2>Settings</h2><p class="sub">Supabase connection, store profile, realtime status, and future offline sync architecture notes.</p></div>
+        </div>
+        <div class="grid two">
+          <div class="card pad">
+            <h3 style="margin-top:0">Connection</h3>
+            <div class="form-grid">
+              <div class="field full"><label>Supabase URL</label><input id="supabaseUrl" readonly></div>
+              <div class="field full"><label>Supabase Publishable Key</label><input id="supabaseKey" readonly></div>
+              <div class="field"><label>Realtime</label><input readonly value="Enabled for products, sales, credits, notifications"></div>
+              <div class="field"><label>Offline Sync</label><input readonly value="Prepared architecture; not enabled"></div>
+            </div>
+          </div>
+          <div class="card pad">
+            <h3 style="margin-top:0">Store Profile</h3>
+            <div class="form-grid">
+              <div class="field"><label>Store</label><input value="Cloud11"></div>
+              <div class="field"><label>Location</label><input value="Guanaja, Islas de la Bahia"></div>
+              <div class="field"><label>Offer</label><input value="Premium vapes, pods, e-liquids, accessories"></div>
+              <div class="field"><label>Delivery</label><input value="Fast, local, discreet"></div>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
-  </div>
-
-  <nav class="mobile-nav" id="mobileNav"></nav>
-
-  <div class="drawer" id="modal">
-    <div class="modal">
-      <div class="topbar" style="margin-bottom:14px">
-        <div><h2 id="modalTitle"></h2><p id="modalSub"></p></div>
-        <button class="btn icon-only" id="closeModal" title="Cerrar"></button>
-      </div>
-      <div id="modalBody"></div>
-    </div>
   </div>
 
   <div class="toast" id="toast"></div>
 
+  <div class="scanner-modal" id="scannerModal" aria-hidden="true">
+    <div class="card scanner-box">
+      <div class="panel-head">
+        <div><h3>Barcode Camera Scan</h3><p class="sub" id="scannerHelp">Point the iPhone camera at the vape box barcode.</p></div>
+        <button class="btn danger" data-action="stopCamera">Close</button>
+      </div>
+      <div class="scanner-frame">
+        <video id="scannerVideo" playsinline muted></video>
+        <div class="scanner-line"></div>
+      </div>
+      <p class="sub">USB scanners are supported automatically on desktop because they type the barcode and press Enter.</p>
+    </div>
+  </div>
+
+  <div class="modal" id="productModal" aria-hidden="true">
+    <div class="card pad modal-card">
+      <div class="panel-head">
+        <div><h3 id="productModalTitle">New Product From Barcode</h3><p class="sub">Unknown barcode detected. Save the product once, then future scans will open it instantly.</p></div>
+        <button class="btn danger" data-action="closeProductModal">Close</button>
+      </div>
+      <form class="form-grid" id="productForm">
+        <div class="field"><label>Barcode</label><input name="barcode" id="productBarcode" required></div>
+        <div class="field"><label>SKU</label><input name="sku" id="productSku" required></div>
+        <div class="field full"><label>Product Name</label><input name="name" required value="New Scanned Vape Product"></div>
+        <div class="field"><label>Category</label><select name="category_id" id="productCategory"></select></div>
+        <div class="field"><label>Supplier</label><select name="supplier_id" id="productSupplier"></select></div>
+        <div class="field"><label>Brand</label><input name="brand" value="Cloud11"></div>
+        <div class="field"><label>Flavor / Variant</label><input name="flavor" value="New Flavor"></div>
+        <div class="field"><label>Cost</label><input name="unit_cost" type="number" min="0" value="250"></div>
+        <div class="field"><label>Retail</label><input name="retail_price" type="number" min="0" value="450"></div>
+        <div class="field"><label>Opening Stock</label><input name="stock_qty" type="number" min="0" value="0"></div>
+        <div class="field"><label>Reorder Level</label><input name="reorder_level" type="number" min="0" value="6"></div>
+        <div class="field full"><label>Description</label><textarea name="description">Created automatically from a scanned barcode.</textarea></div>
+        <div class="field full"><button class="btn primary" type="submit">Save Product</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="paymentModal" aria-hidden="true">
+    <div class="card pad modal-card">
+      <div class="panel-head">
+        <div><h3>Record Credit Payment</h3><p class="sub">Choose the customer credit and enter the exact amount paid.</p></div>
+        <button class="btn danger" data-action="closePaymentModal">Close</button>
+      </div>
+      <form class="form-grid" id="paymentForm">
+        <div class="field full"><label>Credit Account</label><select id="paymentCredit" name="credit_id" required></select></div>
+        <div class="field"><label>Amount</label><input id="paymentAmount" name="amount" type="number" min="0.01" step="0.01" required></div>
+        <div class="field"><label>Payment Type</label><select name="payment_type"><option>cash</option><option>card</option><option>transfer</option></select></div>
+        <div class="field full"><button class="btn primary" type="submit">Save Payment</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="faultyModal" aria-hidden="true">
+    <div class="card pad modal-card">
+      <div class="panel-head">
+        <div><h3>Report Faulty Product</h3><p class="sub">Track bad vapes returned by customers without counting them as income.</p></div>
+        <button class="btn danger" data-action="closeFaultyModal">Close</button>
+      </div>
+      <form class="form-grid" id="faultyForm">
+        <div class="field"><label>Product</label><select id="faultyProduct" name="product_id" required></select></div>
+        <div class="field"><label>Customer</label><select id="faultyCustomer" name="customer_id"></select></div>
+        <div class="field"><label>Quantity</label><input name="quantity" type="number" min="1" value="1" required></div>
+        <div class="field"><label>Outcome</label><select name="outcome"><option>replacement_given</option><option>refund_given</option><option>store_loss</option><option>supplier_claim</option></select></div>
+        <div class="field"><label>Estimated Cost</label><input name="cost" type="number" min="0" step="0.01" value="0"></div>
+        <div class="field"><label>Barcode</label><input name="barcode" id="faultyBarcode" autocomplete="off"></div>
+        <div class="field full"><label>Notes</label><textarea name="notes">Customer reported faulty vape.</textarea></div>
+        <div class="field full"><button class="btn primary" type="submit">Save Faulty Return</button></div>
+      </form>
+    </div>
+  </div>
+
   <script>
-    const icons = {
-      dashboard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg>',
-      receipt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/></svg>',
-      crew: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-      catalog: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
-      report: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-7"/></svg>',
-      settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1v.2a2 2 0 1 1-4 0V21a1.7 1.7 0 0 0-1-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1-.4h-.2a2 2 0 1 1 0-4H3a1.7 1.7 0 0 0 1.56-1 1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1v-.2a2 2 0 1 1 4 0V3a1.7 1.7 0 0 0 1 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.2.4.6.7 1 .7h.2a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1 .6z"/></svg>',
-      plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14"/></svg>',
-      save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>',
-      print: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>',
-      download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>',
-      close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 6 6 18M6 6l12 12"/></svg>',
-      sync: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 12A9 9 0 0 1 18.5 5.8L21 8"/><path d="M3 16h5M16 8h5"/></svg>',
-      trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 15H6L5 6"/></svg>'
-    };
-
-    const i18n = {
-      es: {
-        brandSub: 'Control de dinero a bordo', dashboard: 'Dashboard', payments: 'Entregas', receipts: 'Recibos', crew: 'Marinos',
-        catalogs: 'Catálogos', reports: 'Reportes', settings: 'Configuración', pendingSync: 'pendientes de sincronizar',
-        titleDashboard: 'Bienvenido', subDashboard: 'Controla pagos, recibos y reportes de tripulación pesquera.',
-        titlePayments: 'Nuevo pago', subPayments: 'Registra dinero, precio, evidencia y firma digital.',
-        titleReceipts: 'Recibos', subReceipts: 'Historial de recibos emitidos y listos para imprimir.',
-        titleCrew: 'Marinos', subCrew: 'Personal registrado por embarcación y cargo.',
-        titleCatalogs: 'Catálogos', subCatalogs: 'Embarcaciones, capitanes, cargos y conceptos.',
-        titleReports: 'Reportes', subReports: 'Filtra por marino, embarcación, capitán, concepto, fecha y temporada.',
-        titleSettings: 'Seguridad y Supabase', subSettings: 'Usuarios por capitán, roles, conexión, auditoría local y sincronización.',
-        newPayment: 'Nuevo recibo', configure: 'Supabase', totalPaid: 'Total entregado', crewCount: 'Marinos registrados',
-        receiptsIssued: 'Recibos emitidos', average: 'Promedio por marino', month: 'Este mes', onboard: 'A bordo',
-        sailor: 'Marino', vessel: 'Embarcación', captain: 'Capitán', role: 'Cargo', concept: 'Concepto', date: 'Fecha',
-        quantity: 'Cantidad', price: 'Precio', total: 'Total', notes: 'Observaciones', photo: 'Fotografía',
-        signature: 'Firma digital', savePayment: 'Generar recibo', clear: 'Limpiar', preview: 'Vista previa del recibo',
-        clearSignature: 'Limpiar firma',
-        receiptBy: 'Recibí de', amountText: 'La cantidad de', conceptText: 'Por concepto de', evidence: 'Evidencia',
-        signHere: 'Firma', printNote: 'Imprime el recibo o guárdalo como PDF desde el navegador.',
-        search: 'Buscar...', exportExcel: 'Exportar Excel', exportPdf: 'PDF/Imprimir', all: 'Todos',
-        add: 'Agregar', save: 'Guardar', delete: 'Eliminar', name: 'Nombre', phone: 'Teléfono', dni: 'DNI',
-        email: 'Correo', admin: 'Administrador', query: 'Consulta', language: 'Idioma', roleUser: 'Rol actual',
-        currentCaptain: 'Usuario capitán', accessNote: 'Los capitanes solo ven su embarcación, sus marinos y sus recibos.',
-        adminAccessNote: 'El administrador puede ver todas las embarcaciones, marinos, pagos y reportes.',
-        supabaseUrl: 'URL de Supabase', supabaseKey: 'Anon key de Supabase', syncNow: 'Sincronizar ahora',
-        connected: 'Online', offline: 'Sin conexión', synced: 'Sincronizado', savedLocal: 'Guardado localmente',
-        schema: 'Esquema SQL sugerido', setupHint: 'Crea estas tablas en Supabase y pega tu URL y anon key aquí.'
-      },
-      en: {
-        brandSub: 'Money control on board', dashboard: 'Dashboard', payments: 'Payments', receipts: 'Receipts', crew: 'Crew',
-        catalogs: 'Catalogs', reports: 'Reports', settings: 'Settings', pendingSync: 'pending sync',
-        titleDashboard: 'Welcome', subDashboard: 'Manage payments, receipts, and fishing crew reports.',
-        titlePayments: 'New payment', subPayments: 'Register money, price, evidence, and digital signature.',
-        titleReceipts: 'Receipts', subReceipts: 'Issued receipts ready to print.',
-        titleCrew: 'Crew', subCrew: 'Crew members by vessel and role.',
-        titleCatalogs: 'Catalogs', subCatalogs: 'Vessels, captains, roles, and payment concepts.',
-        titleReports: 'Reports', subReports: 'Filter by crew member, vessel, captain, concept, date, and season.',
-        titleSettings: 'Security and Supabase', subSettings: 'Captain users, roles, connection, local audit, and synchronization.',
-        newPayment: 'New receipt', configure: 'Supabase', totalPaid: 'Total paid', crewCount: 'Registered crew',
-        receiptsIssued: 'Receipts issued', average: 'Average per sailor', month: 'This month', onboard: 'On board',
-        sailor: 'Sailor', vessel: 'Vessel', captain: 'Captain', role: 'Role', concept: 'Concept', date: 'Date',
-        quantity: 'Quantity', price: 'Price', total: 'Total', notes: 'Notes', photo: 'Photo',
-        signature: 'Digital signature', savePayment: 'Generate receipt', clear: 'Clear', preview: 'Receipt preview',
-        clearSignature: 'Clear signature',
-        receiptBy: 'Received from', amountText: 'The amount of', conceptText: 'For concept of', evidence: 'Evidence',
-        signHere: 'Signature', printNote: 'Print the receipt or save it as PDF from the browser.',
-        search: 'Search...', exportExcel: 'Export Excel', exportPdf: 'PDF/Print', all: 'All',
-        add: 'Add', save: 'Save', delete: 'Delete', name: 'Name', phone: 'Phone', dni: 'ID',
-        email: 'Email', admin: 'Administrator', query: 'View only', language: 'Language', roleUser: 'Current role',
-        currentCaptain: 'Captain user', accessNote: 'Captains only see their vessel, their crew, and their receipts.',
-        adminAccessNote: 'The administrator can see all vessels, crew, payments, and reports.',
-        supabaseUrl: 'Supabase URL', supabaseKey: 'Supabase anon key', syncNow: 'Sync now',
-        connected: 'Online', offline: 'Offline', synced: 'Synced', savedLocal: 'Saved locally',
-        schema: 'Suggested SQL schema', setupHint: 'Create these tables in Supabase, then paste your URL and anon key here.'
-      }
-    };
-
-    const defaults = {
-      captains: [
-        { id: 'cap-1', authUserId: '', name: 'ELVIS', phone: null, email: null },
-        { id: 'cap-2', authUserId: '', name: 'PICHY', phone: null, email: null },
-        { id: 'cap-3', authUserId: '', name: 'WILMER', phone: null, email: null },
-        { id: 'cap-4', authUserId: '', name: 'CHALO', phone: null, email: null },
-        { id: 'cap-5', authUserId: '', name: 'GALGA', phone: null, email: null }
-      ],
-      vessels: [
-        { id: 'ves-1', captainId: 'cap-1', name: 'Vessel 1', captain: 'ELVIS', season: '2026' },
-        { id: 'ves-2', captainId: 'cap-2', name: 'Vessel 2', captain: 'PICHY', season: '2026' },
-        { id: 'ves-3', captainId: 'cap-3', name: 'Vessel 3', captain: 'WILMER', season: '2026' },
-        { id: 'ves-4', captainId: 'cap-4', name: 'Vessel 4', captain: 'CHALO', season: '2026' },
-        { id: 'ves-5', captainId: 'cap-5', name: 'Vessel 5', captain: 'GALGA', season: '2026' }
-      ],
-      roles: ['Cubierta', 'Maquinas', 'Cocina', 'Buzo', 'Capitan'],
-      concepts: ['Adelanto', 'Viveres', 'Equipo', 'Combustible', 'Bono', 'Liquidacion'],
-      crew: [
-        { id: uid(), captainId: 'cap-1', vesselId: 'ves-1', name: 'Carlos Martinez', dni: '0801-1990-12345', phone: '504 9876-1111', vessel: 'Langostera Norte', role: 'Cubierta', active: true },
-        { id: uid(), captainId: 'cap-1', vesselId: 'ves-1', name: 'Jose Ramirez', dni: '0801-1988-23456', phone: '504 9876-2222', vessel: 'Langostera Norte', role: 'Maquinas', active: true },
-        { id: uid(), captainId: 'cap-2', vesselId: 'ves-2', name: 'Luis Ortega', dni: '0801-1994-34567', phone: '504 9876-3333', vessel: 'Reina del Caribe', role: 'Buzo', active: true },
-        { id: uid(), captainId: 'cap-3', vesselId: 'ves-3', name: 'Ramon Castillo', dni: '0801-1987-44444', phone: '504 9876-4444', vessel: 'Estrella del Mar', role: 'Cocina', active: true },
-        { id: uid(), captainId: 'cap-4', vesselId: 'ves-4', name: 'Oscar Medina', dni: '0801-1991-55555', phone: '504 9876-5555', vessel: 'Caribe Azul', role: 'Cubierta', active: true },
-        { id: uid(), captainId: 'cap-5', vesselId: 'ves-5', name: 'Hector Cruz', dni: '0801-1993-66666', phone: '504 9876-6666', vessel: 'Santa Elena', role: 'Buzo', active: true }
-      ],
-      payments: [],
-      audit: []
-    };
-
-    const APP_SUPABASE_CONFIG = {
-      url: 'https://hsekrxabiuyvpflumekp.supabase.co',
-      key: 'sb_publishable_UhnWVr2e8skCHcTiYlGejA_DPXRl9e2'
+    const SUPABASE_URL = "https://dhlhzpocrukpbvvppwxj.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_XnUWgPm2x9ShI3TOkzTY7w_-Qw9dc1o";
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const emptyData = {
+      roles: [],
+      categories: [],
+      suppliers: [],
+      customers: [],
+      products: [],
+      product_images: [],
+      product_variants: [],
+      sales: [],
+      sale_items: [],
+      credits: [],
+      credit_payments: [],
+      inventory_history: [],
+      purchases: [],
+      purchase_items: [],
+      notifications: [],
+      activity_logs: [],
+      scan_history: [],
+      settings: []
     };
 
     const state = {
-      lang: localStorage.getItem('cc_lang') || 'es',
-      view: 'dashboard',
-      db: loadDb(),
-      config: { ...JSON.parse(localStorage.getItem('cc_config') || '{}'), ...APP_SUPABASE_CONFIG },
-      filter: '',
-      reportFilter: {},
-      supabase: null,
+      page: "dashboard",
+      search: "",
+      categoryFilter: "all",
+      productSort: "name",
+      reportMode: "month",
+      reportStart: "",
+      reportEnd: "",
+      cart: [],
+      data: structuredClone(emptyData),
       session: null,
+      user: null,
+      profile: null,
+      online: false,
       realtimeChannel: null
     };
 
-    function loadDb() {
-      const saved = localStorage.getItem('cc_db');
-      if (saved) return normalizeDb(JSON.parse(saved));
-      localStorage.setItem('cc_db', JSON.stringify(defaults));
-      return JSON.parse(JSON.stringify(defaults));
-    }
-    function normalizeDb(db) {
-      const merged = { ...JSON.parse(JSON.stringify(defaults)), ...db };
-      merged.captains = merged.captains.map((captain, index) => ({ id: captain.id || `cap-${index + 1}`, authUserId: captain.authUserId || '', ...captain }));
-      merged.vessels = merged.vessels.map((vessel, index) => {
-        const captain = merged.captains.find(c => c.name === vessel.captain) || merged.captains[index] || merged.captains[0];
-        return { id: vessel.id || `ves-${index + 1}`, captainId: vessel.captainId || captain?.id || '', ...vessel };
-      });
-      merged.crew = merged.crew.map(member => {
-        const vessel = merged.vessels.find(v => v.name === member.vessel) || merged.vessels.find(v => v.id === member.vesselId) || merged.vessels[0];
-        return { ...member, id: member.id || uid(), vesselId: member.vesselId || vessel?.id || '', captainId: member.captainId || vessel?.captainId || '' };
-      });
-      merged.payments = (merged.payments || []).map(payment => {
-        const vessel = merged.vessels.find(v => v.name === payment.vessel) || merged.vessels.find(v => v.id === payment.vesselId);
-        return { ...payment, id: payment.id || uid(), vesselId: payment.vesselId || vessel?.id || '', captainId: payment.captainId || vessel?.captainId || '', synced: !!payment.synced };
-      });
-      return merged;
-    }
-    function persist() { localStorage.setItem('cc_db', JSON.stringify(state.db)); updateSyncCount(); }
-    function t(key) { return i18n[state.lang][key] || key; }
-    function money(value) { return 'L ' + Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-    function today() { return new Date().toISOString().slice(0, 10); }
-    function monthName(date) { return new Date(date + 'T12:00:00').toLocaleDateString(state.lang === 'es' ? 'es-HN' : 'en-US', { month: 'long' }); }
-    function icon(name) { return icons[name] || ''; }
-    function uid() {
-      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-      return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
-    }
-    function escapeHtml(value) {
-      return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-    }
-    function toast(message) {
-      const el = document.getElementById('toast');
-      el.textContent = message;
-      el.classList.add('show');
-      setTimeout(() => el.classList.remove('show'), 2600);
-    }
-    function setLoginMessage(message) {
-      const el = document.getElementById('loginStatus');
-      if (el) el.textContent = message || '';
-    }
-    function updateAuthGate() {
-      const gate = document.getElementById('loginGate');
-      if (!gate) return;
-      gate.classList.toggle('hidden', !!state.session);
-      document.body.classList.toggle('locked', !state.session);
-    }
-    function recordAudit(action, detail) {
-      state.db.audit.unshift({ id: uid(), action, detail, at: new Date().toISOString(), role: state.config.role || 'Administrador' });
-      state.db.audit = state.db.audit.slice(0, 100);
-    }
-    function currentRole() {
-      return state.config.role || 'Administrador';
-    }
-    function isAdmin() {
-      return currentRole() === t('admin') || currentRole() === 'Administrador' || currentRole() === 'Administrator';
-    }
-    function currentCaptainId() {
-      return state.config.captainId || state.db.captains[0]?.id || '';
-    }
-    function currentCaptain() {
-      return state.db.captains.find(c => c.id === currentCaptainId()) || state.db.captains[0] || {};
-    }
-    function visibleVessels() {
-      return isAdmin() ? state.db.vessels : state.db.vessels.filter(v => v.captainId === currentCaptainId());
-    }
-    function visibleCrew() {
-      return isAdmin() ? state.db.crew : state.db.crew.filter(c => c.captainId === currentCaptainId());
-    }
-    function visiblePayments() {
-      return isAdmin() ? state.db.payments : state.db.payments.filter(p => p.captainId === currentCaptainId());
-    }
-    function scopedPaymentPayload(data) {
-      const vessel = visibleVessels().find(v => v.name === data.vessel) || state.db.vessels.find(v => v.name === data.vessel) || visibleVessels()[0] || {};
-      return { ...data, vesselId: vessel.id || '', captainId: vessel.captainId || currentCaptainId() };
-    }
+    const tables = ["profiles", "roles", "categories", "suppliers", "customers", "products", "product_images", "product_variants", "sales", "sale_items", "credits", "credit_payments", "inventory_history", "purchases", "purchase_items", "notifications", "activity_logs", "scan_history", "settings"];
 
+    const db = {
+      async list(table, options = {}) {
+        let query = supabaseClient.from(table).select(options.select || "*");
+        if (options.order) query = query.order(options.order, { ascending: options.ascending ?? true });
+        if (options.limit) query = query.limit(options.limit);
+        const { data, error } = await query;
+        if (error) throw error;
+        return data || [];
+      },
+      async insert(table, payload) {
+        const { data, error } = await supabaseClient.from(table).insert(payload).select();
+        if (error) throw error;
+        return data;
+      },
+      async update(table, id, payload) {
+        const { data, error } = await supabaseClient.from(table).update(payload).eq("id", id).select();
+        if (error) throw error;
+        return data;
+      },
+      async remove(table, id) {
+        const { error } = await supabaseClient.from(table).delete().eq("id", id);
+        if (error) throw error;
+        return true;
+      },
+      async getProfile(userId) {
+        const { data, error } = await supabaseClient.from("profiles").select("id, full_name, phone, status, roles(name)").eq("id", userId).maybeSingle();
+        if (error) throw error;
+        return data;
+      },
+      async upsertProfile(profile) {
+        const { data, error } = await supabaseClient.from("profiles").upsert(profile, { onConflict: "id" }).select().single();
+        if (error) throw error;
+        return data;
+      },
+      subscribe() {
+        if (state.realtimeChannel) supabaseClient.removeChannel(state.realtimeChannel);
+        state.realtimeChannel = supabaseClient.channel("cloud11-live")
+          .on("postgres_changes", { event: "*", schema: "public", table: "products" }, refreshData)
+          .on("postgres_changes", { event: "*", schema: "public", table: "product_variants" }, refreshData)
+          .on("postgres_changes", { event: "*", schema: "public", table: "sales" }, refreshData)
+          .on("postgres_changes", { event: "*", schema: "public", table: "credits" }, refreshData)
+          .on("postgres_changes", { event: "*", schema: "public", table: "inventory_history" }, refreshData)
+          .on("postgres_changes", { event: "*", schema: "public", table: "scan_history" }, refreshData)
+          .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, refreshData)
+          .subscribe();
+      }
+    };
     const navItems = [
-      ['dashboard', 'dashboard', 'dashboard'],
-      ['payments', 'receipt', 'payments'],
-      ['receipts', 'receipt', 'receipts'],
-      ['crew', 'crew', 'crew'],
-      ['catalogs', 'catalog', 'catalogs'],
-      ['reports', 'report', 'reports'],
-      ['settings', 'settings', 'settings']
+      ["dashboard", "D", "Dashboard"],
+      ["products", "P", "Products"],
+      ["inventory", "I", "Inventory"],
+      ["sales", "S", "Sales / POS"],
+      ["credits", "C", "Credits"],
+      ["customers", "U", "Customers"],
+      ["suppliers", "V", "Suppliers"],
+      ["reports", "R", "Reports"],
+      ["activity", "A", "Activity Log"],
+      ["settings", "G", "Settings"]
     ];
 
-    function renderNav() {
-      const side = document.getElementById('sideNav');
-      const mobile = document.getElementById('mobileNav');
-      side.innerHTML = navItems.map(([view, ic, label]) => `
-        <button class="${state.view === view ? 'active' : ''}" data-go="${view}">${icon(ic)}<span>${t(label)}</span></button>
-      `).join('');
-      mobile.innerHTML = navItems.slice(0, 5).map(([view, ic, label]) => `
-        <button class="${state.view === view ? 'active' : ''}" data-go="${view}">${icon(ic)}<span>${t(label)}</span></button>
-      `).join('');
+    const $ = (selector, root = document) => root.querySelector(selector);
+    const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+    const money = value => `L ${Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const byId = (items, id) => items.find(item => item.id === id) || {};
+    const todayIso = () => new Date().toISOString();
+    const deletedStatuses = new Set(["deleted", "void", "voided", "cancelled", "canceled", "archived"]);
+
+    function toast(message) {
+      const el = $("#toast");
+      el.textContent = message;
+      el.classList.add("show");
+      clearTimeout(toast.timer);
+      toast.timer = setTimeout(() => el.classList.remove("show"), 3200);
     }
 
-    function go(view) {
-      state.view = view;
-      document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === view));
-      document.getElementById('pageTitle').textContent = pageTitleFor(view);
-      document.getElementById('pageSub').textContent = t('sub' + view[0].toUpperCase() + view.slice(1));
-      renderNav();
-      renderView();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-    function pageTitleFor(view) {
-      if (view !== 'dashboard') return t('title' + view[0].toUpperCase() + view.slice(1));
-      if (isAdmin()) return state.lang === 'es' ? 'Bienvenido, Admin' : 'Welcome, Admin';
-      const name = currentCaptain().name || (state.lang === 'es' ? 'Capitan' : 'Captain');
-      return state.lang === 'es' ? `Bienvenido, ${name}` : `Welcome, ${name}`;
+    function setStatus(online, text) {
+      state.online = online;
+      const el = $("#dbStatus");
+      el.style.color = online ? "var(--green)" : "var(--yellow)";
+      el.style.borderColor = online ? "rgba(54,245,162,.3)" : "rgba(255,227,110,.3)";
+      el.querySelector("span:last-child").textContent = text;
     }
 
-    function paymentTotal(p) { return Number(p.quantity || 0) * Number(p.price || 0); }
-    function blankReceiptData() {
-      const sailor = visibleCrew()[0] || {};
-      const vessel = visibleVessels().find(v => v.name === sailor.vessel) || visibleVessels()[0] || {};
-      return {
-        sailorName: sailor.name || '',
-        dni: sailor.dni || '',
-        vessel: sailor.vessel || vessel.name || '',
-        captain: vessel.captain || currentCaptain().name || '',
-        concept: state.db.concepts[0] || '',
-        date: today(),
-        quantity: 1,
-        price: 0,
-        total: 0,
-        notes: '',
-        photo: ''
-      };
-    }
-    function currentReceiptData() {
-      const formEl = document.getElementById('paymentForm');
-      if (!formEl) return blankReceiptData();
-      const form = new FormData(formEl);
-      const sailor = visibleCrew().find(c => c.id === form.get('crewId')) || visibleCrew()[0] || {};
-      const qty = Number(form.get('quantity') || 0);
-      const price = Number(form.get('price') || 0);
-      return {
-        sailorName: sailor.name || '',
-        dni: sailor.dni || '',
-        vessel: form.get('vessel') || sailor.vessel || '',
-        captain: form.get('captain') || visibleVessels().find(v => v.name === sailor.vessel)?.captain || '',
-        concept: form.get('concept') || '',
-        date: form.get('date') || today(),
-        quantity: qty,
-        price,
-        total: qty * price,
-        notes: form.get('notes') || '',
-        photo: document.getElementById('photoPreview')?.src || '',
-        signature: document.getElementById('sigPad')?.dataset.signed ? document.getElementById('sigPad').toDataURL('image/png') : ''
-      };
+    function setAuthMessage(message, isError = false) {
+      const el = $("#authMessage");
+      el.textContent = message;
+      el.style.color = isError ? "var(--danger)" : "var(--muted)";
     }
 
-    function renderReceipt(p) {
-      const data = p || currentReceiptData();
-      const d = new Date((data.date || today()) + 'T12:00:00');
-      const day = d.getDate();
-      const year = d.getFullYear();
-      return `
-        <div class="receipt">
-          <h3>${state.lang === 'es' ? 'RECIBO POR' : 'RECEIPT FOR'} <span class="line">${money(data.total)}</span></h3>
-          <p>${state.lang === 'es' ? 'Yo' : 'I'}: <strong>${escapeHtml(data.sailorName || '________________')}</strong></p>
-          <p>${t('dni')}: ${escapeHtml(data.dni || '________________')}</p>
-          <p>${t('receiptBy')}: <strong>${escapeHtml(data.captain || '________________')}</strong></p>
-          <br>
-          <p>${t('amountText')}: <strong>${money(data.total)}</strong></p>
-          <p>${state.lang === 'es' ? 'Cantidad' : 'Quantity'}: ${Number(data.quantity || 0).toLocaleString()} x ${money(data.price)}</p>
-          <p>${t('conceptText')}: <strong>${escapeHtml(data.concept || '________________')}</strong></p>
-          ${data.notes ? `<p>${t('notes')}: ${escapeHtml(data.notes)}</p>` : ''}
-          ${data.photo ? `<p>${t('evidence')}:</p><img class="receipt-photo" src="${data.photo}" alt="Evidencia">` : ''}
-          <br>
-          <p>${state.lang === 'es' ? 'Para constancia firmo en la ciudad de Guanaja, Islas de la Bahia, a los' : 'Signed in Guanaja, Bay Islands, on'} <span class="line">${day}</span> ${state.lang === 'es' ? 'dias del mes de' : 'of'} <span class="line">${monthName(data.date)}</span> ${state.lang === 'es' ? 'de' : ''} <span class="line">${year}</span>.</p>
-          ${data.signature ? `<img class="receipt-signature" src="${data.signature}" alt="${t('signature')}">` : ''}
-          <div class="sign">${t('signHere')}</div>
-        </div>`;
+    function updateWelcome() {
+      const name = state.profile?.full_name || state.user?.user_metadata?.full_name || state.user?.email || "Cloud11 User";
+      $("#welcomeUser").textContent = `Welcome ${name}`;
+      $("#userAvatar").textContent = name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join("").toUpperCase() || "C11";
     }
 
-    function dashboardStats() {
-      const total = visiblePayments().reduce((sum, p) => sum + paymentTotal(p), 0);
-      const receipts = visiblePayments().length;
-      const crew = visibleCrew().filter(c => c.active).length;
-      const avg = crew ? total / crew : 0;
-      return { total, receipts, crew, avg };
+    async function loadProfile() {
+      if (!state.user) return null;
+      let profile = await db.getProfile(state.user.id);
+      if (!profile) {
+        profile = await db.upsertProfile({
+          id: state.user.id,
+          full_name: state.user.user_metadata?.full_name || state.user.email?.split("@")[0] || "Cloud11 User",
+          status: "active"
+        });
+      }
+      state.profile = profile;
+      updateWelcome();
+      return profile;
     }
 
-    function renderDashboard() {
-      const stats = dashboardStats();
-      const byCrew = groupPayments('sailorName');
-      document.getElementById('dashboard').innerHTML = `
-        <div class="grid stats">
-          ${statCard('blue', 'receipt', t('totalPaid'), money(stats.total), t('month'))}
-          ${statCard('green', 'crew', t('crewCount'), stats.crew, t('onboard'))}
-          ${statCard('gold', 'catalog', t('receiptsIssued'), stats.receipts, t('month'))}
-          ${statCard('purple', 'report', t('average'), money(stats.avg), t('month'))}
-        </div>
-        <div class="grid content-grid">
-          <div class="panel">
-            <h2>${t('newPayment')}</h2>
-            <p>${t('subPayments')}</p>
-            ${paymentForm()}
-          </div>
-          <div class="panel">
-            <h2>${t('preview')}</h2>
-            <div id="receiptPreview">${renderReceipt()}</div>
-            <div class="note">${t('printNote')}</div>
-          </div>
-        </div>
-        <div class="panel" style="margin-top:22px">
-          <div class="search-row">
-            <div><h2>${state.lang === 'es' ? 'Entregas por marino' : 'Payments by sailor'}</h2><p>${state.lang === 'es' ? 'Resumen total entregado a cada marino' : 'Total summary per crew member'}</p></div>
-            <button class="btn" onclick="exportCsv()">${icon('download')}${t('exportExcel')}</button>
-          </div>
-          ${paymentsSummaryTable(byCrew)}
-        </div>
-        <div class="grid quick-grid">
-          ${quick('payments', 'receipt', t('newPayment'), t('subPayments'))}
-          ${quick('receipts', 'receipt', t('receipts'), t('subReceipts'))}
-          ${quick('reports', 'report', t('reports'), t('subReports'))}
-          ${quick('settings', 'settings', t('settings'), t('subSettings'))}
-        </div>`;
-      bindPaymentForm();
-    }
-
-    function statCard(color, ic, label, value, sub) {
-      return `<div class="stat"><div class="stat-head"><span class="bubble ${color}">${icon(ic)}</span><span>${label}</span></div><strong>${value}</strong><p>${sub}</p></div>`;
-    }
-    function quick(view, ic, title, sub) {
-      return `<button class="quick" data-go="${view}"><span class="bubble blue">${icon(ic)}</span><strong>${title}<span>${sub}</span></strong></button>`;
-    }
-
-    function paymentForm() {
-      const crewRows = visibleCrew();
-      const vessels = visibleVessels();
-      const captains = isAdmin() ? state.db.captains : [currentCaptain()];
-      const vesselOptions = vessels.map(v => `<option>${escapeHtml(v.name)}</option>`).join('');
-      const captainOptions = captains.map(c => `<option>${escapeHtml(c.name)}</option>`).join('');
-      return `
-        <form class="form" id="paymentForm">
-          <div class="field"><label>${t('sailor')}</label><select name="crewId" required>${crewRows.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select></div>
-          <div class="two">
-            <div class="field"><label>${t('vessel')}</label><select name="vessel">${vesselOptions}</select></div>
-            <div class="field"><label>${t('captain')}</label><select name="captain">${captainOptions}</select></div>
-          </div>
-          <div class="field"><label>${t('concept')}</label><select name="concept">${state.db.concepts.map(c => `<option>${escapeHtml(c)}</option>`).join('')}</select></div>
-          <div class="two">
-            <div class="field"><label>${t('quantity')}</label><input name="quantity" type="number" min="0" step="0.01" value="1" required></div>
-            <div class="field"><label>${t('price')}</label><input name="price" type="number" min="0" step="0.01" placeholder="0.00" required></div>
-          </div>
-          <div class="two">
-            <div class="field"><label>${t('date')}</label><input name="date" type="date" value="${today()}" required></div>
-            <div class="field"><label>${t('photo')}</label><input name="photo" type="file" accept="image/*" capture="environment"></div>
-          </div>
-          <div class="field"><label>${t('notes')}</label><textarea name="notes"></textarea></div>
-          <div class="field"><label>${t('signature')}</label><canvas id="sigPad" class="signature-pad" width="680" height="180"></canvas></div>
-          <img id="photoPreview" class="receipt-photo" alt="" style="display:none">
-          <div class="actions">
-            <button type="reset" class="btn">${t('clear')}</button>
-            <button type="button" class="btn" id="clearSig">${t('clearSignature')}</button>
-            <button type="button" class="btn" onclick="window.print()">${icon('print')}${t('exportPdf')}</button>
-            <button type="submit" class="btn primary">${icon('save')}${t('savePayment')}</button>
-          </div>
-        </form>`;
-    }
-
-    function bindPaymentForm() {
-      const form = document.getElementById('paymentForm');
-      if (!form) return;
-      const crew = visibleCrew()[0] || {};
-      const vessel = visibleVessels().find(v => v.name === crew.vessel);
-      if (crew.vessel) form.elements.vessel.value = crew.vessel;
-      if (vessel?.captain) form.elements.captain.value = vessel.captain;
-      form.addEventListener('input', updateReceiptPreview);
-      setupSignaturePad();
-      form.elements.crewId.addEventListener('change', () => {
-        const selected = visibleCrew().find(c => c.id === form.elements.crewId.value);
-        const selectedVessel = visibleVessels().find(v => v.name === selected?.vessel);
-        if (selected?.vessel) form.elements.vessel.value = selected.vessel;
-        if (selectedVessel?.captain) form.elements.captain.value = selectedVessel.captain;
-        updateReceiptPreview();
-      });
-      form.elements.photo.addEventListener('change', event => {
-        const file = event.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-          const img = document.getElementById('photoPreview');
-          img.src = reader.result;
-          img.style.display = 'block';
-          updateReceiptPreview();
-        };
-        reader.readAsDataURL(file);
-      });
-      form.addEventListener('submit', event => {
-        event.preventDefault();
-        const data = currentReceiptData();
-        const payment = { id: uid(), number: nextReceiptNumber(), ...scopedPaymentPayload(data), synced: false, createdAt: new Date().toISOString() };
-        state.db.payments.unshift(payment);
-        recordAudit('payment.created', `${payment.number} ${payment.sailorName} ${money(payment.total)}`);
-        persist();
-        form.reset();
-        clearSignaturePad();
-        toast(t('savedLocal'));
-        renderView();
-        syncSupabase();
-      });
-      updateReceiptPreview();
-    }
-    function setupSignaturePad() {
-      const canvas = document.getElementById('sigPad');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      ctx.lineWidth = 3;
-      ctx.lineCap = 'round';
-      ctx.strokeStyle = '#101828';
-      let drawing = false;
-      const point = event => {
-        const rect = canvas.getBoundingClientRect();
-        const touch = event.touches ? event.touches[0] : event;
-        return { x: (touch.clientX - rect.left) * canvas.width / rect.width, y: (touch.clientY - rect.top) * canvas.height / rect.height };
-      };
-      const start = event => {
-        event.preventDefault();
-        drawing = true;
-        const p = point(event);
-        ctx.beginPath();
-        ctx.moveTo(p.x, p.y);
-      };
-      const move = event => {
-        if (!drawing) return;
-        event.preventDefault();
-        const p = point(event);
-        ctx.lineTo(p.x, p.y);
-        ctx.stroke();
-        canvas.dataset.signed = 'true';
-        updateReceiptPreview();
-      };
-      const stop = () => { drawing = false; };
-      canvas.addEventListener('mousedown', start);
-      canvas.addEventListener('mousemove', move);
-      window.addEventListener('mouseup', stop);
-      canvas.addEventListener('touchstart', start, { passive: false });
-      canvas.addEventListener('touchmove', move, { passive: false });
-      canvas.addEventListener('touchend', stop);
-      document.getElementById('clearSig')?.addEventListener('click', clearSignaturePad);
-    }
-    function clearSignaturePad() {
-      const canvas = document.getElementById('sigPad');
-      if (!canvas) return;
-      canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-      delete canvas.dataset.signed;
-      updateReceiptPreview();
-    }
-    function updateReceiptPreview() {
-      const preview = document.getElementById('receiptPreview');
-      if (preview) preview.innerHTML = renderReceipt();
-    }
-    function nextReceiptNumber() {
-      const prefix = isAdmin() ? 'ADM' : currentCaptainId().replace('cap-', 'CAP');
-      return prefix + '-REC-' + String(visiblePayments().length + 1).padStart(5, '0');
-    }
-
-    function groupPayments(key) {
-      return visiblePayments().reduce((map, p) => {
-        const name = p[key] || 'N/A';
-        if (!map[name]) map[name] = { count: 0, total: 0, last: '', vessel: p.vessel };
-        map[name].count += 1;
-        map[name].total += paymentTotal(p);
-        map[name].last = !map[name].last || p.date > map[name].last ? p.date : map[name].last;
-        return map;
-      }, {});
-    }
-    function paymentsSummaryTable(group) {
-      const rows = Object.entries(group);
-      return `<div class="table-wrap"><table><thead><tr><th>${t('sailor')}</th><th>${t('vessel')}</th><th>${t('total')}</th><th>${state.lang === 'es' ? 'Ultima entrega' : 'Last payment'}</th><th>${t('receipts')}</th></tr></thead><tbody>
-        ${rows.length ? rows.map(([name, r]) => `<tr><td><span class="avatar">${escapeHtml(name[0])}</span>${escapeHtml(name)}</td><td>${escapeHtml(r.vessel)}</td><td>${money(r.total)}</td><td>${r.last}</td><td>${r.count}</td></tr>`).join('') : `<tr><td colspan="5">${state.lang === 'es' ? 'Sin pagos registrados' : 'No payments yet'}</td></tr>`}
-      </tbody></table></div>`;
-    }
-
-    function renderPayments() {
-      document.getElementById('payments').innerHTML = `<div class="grid content-grid"><div class="panel"><h2>${t('newPayment')}</h2><p>${t('subPayments')}</p>${paymentForm()}</div><div class="panel"><h2>${t('preview')}</h2><div id="receiptPreview">${renderReceipt()}</div><div class="note">${t('printNote')}</div></div></div>`;
-      bindPaymentForm();
-    }
-    function renderReceipts() {
-      const q = state.filter.toLowerCase();
-      const rows = visiblePayments().filter(p => JSON.stringify(p).toLowerCase().includes(q));
-      document.getElementById('receipts').innerHTML = `
-        <div class="panel">
-          <div class="search-row">
-            <input class="input" placeholder="${t('search')}" value="${escapeHtml(state.filter)}" oninput="state.filter=this.value;renderReceipts()">
-            <div class="actions"><button class="btn" onclick="exportCsv()">${icon('download')}${t('exportExcel')}</button><button class="btn" onclick="window.print()">${icon('print')}${t('exportPdf')}</button></div>
-          </div>
-          <div class="table-wrap"><table><thead><tr><th>#</th><th>${t('date')}</th><th>${t('sailor')}</th><th>${t('concept')}</th><th>${t('total')}</th><th>${t('vessel')}</th><th>${t('settings')}</th></tr></thead><tbody>
-          ${rows.map(p => `<tr><td>${p.number}</td><td>${p.date}</td><td>${escapeHtml(p.sailorName)}</td><td>${escapeHtml(p.concept)}</td><td>${money(p.total)}</td><td>${escapeHtml(p.vessel)}</td><td><button class="btn icon-only" title="Imprimir" onclick="printReceipt('${p.id}')">${icon('print')}</button></td></tr>`).join('') || `<tr><td colspan="7">Sin recibos</td></tr>`}
-          </tbody></table></div>
-          <div id="printSlot" style="display:none"></div>
-        </div>`;
-    }
-    function printReceipt(id) {
-      const p = visiblePayments().find(x => x.id === id);
-      if (!p) return toast(t('accessNote'));
-      document.getElementById('printSlot').innerHTML = renderReceipt(p);
-      document.getElementById('printSlot').style.display = 'block';
-      setTimeout(() => {
-        window.print();
-        document.getElementById('printSlot').style.display = 'none';
-      }, 100);
-    }
-
-    function renderCrew() {
-      const rows = visibleCrew();
-      document.getElementById('crew').innerHTML = `
-        <div class="panel">
-          <div class="search-row"><div><h2>${t('crew')}</h2><p>${t('subCrew')}</p></div><button class="btn primary" onclick="openEntityModal('crew')">${icon('plus')}${t('add')}</button></div>
-          <div class="table-wrap"><table><thead><tr><th>${t('name')}</th><th>${t('dni')}</th><th>${t('phone')}</th><th>${t('vessel')}</th><th>${t('role')}</th><th>${t('delete')}</th></tr></thead><tbody>
-          ${rows.map(c => `<tr><td><span class="avatar">${escapeHtml(c.name[0])}</span>${escapeHtml(c.name)}</td><td>${escapeHtml(c.dni)}</td><td>${escapeHtml(c.phone)}</td><td>${escapeHtml(c.vessel)}</td><td>${escapeHtml(c.role)}</td><td><button class="btn icon-only danger" onclick="deleteEntity('crew','${c.id}')">${icon('trash')}</button></td></tr>`).join('')}
-          </tbody></table></div>
-        </div>`;
-    }
-    function renderCatalogs() {
-      if (!isAdmin()) {
-        document.getElementById('catalogs').innerHTML = `<div class="panel"><h2>${t('catalogs')}</h2><div class="note">${t('accessNote')}</div>${paymentsSummaryTable(groupPayments('sailorName'))}</div>`;
+    async function activateSession(session) {
+      state.session = session;
+      state.user = session?.user || null;
+      if (!state.user) {
+        document.body.classList.remove("authenticated");
+        state.data = structuredClone(emptyData);
+        renderAll();
         return;
       }
-      document.getElementById('catalogs').innerHTML = `
-        <div class="grid content-grid">
-          ${catalogPanel('vessels', t('vessel'), ['name','captain','season'])}
-          ${catalogPanel('captains', t('captain'), ['name','phone','email'])}
-          ${listPanel('roles', t('role'))}
-          ${listPanel('concepts', t('concept'))}
-        </div>`;
+      try {
+        await loadProfile();
+        document.body.classList.add("authenticated");
+        await refreshData();
+      } catch (error) {
+        console.warn("Cloud11 setup required:", error);
+        document.body.classList.remove("authenticated");
+        setStatus(false, "Setup Needed");
+        setAuthMessage("Login worked, but the database is not ready or permissions need attention. Check Supabase, then log in again.", true);
+      }
     }
-    function catalogPanel(key, title, fields) {
-      return `<div class="panel"><div class="search-row"><h2>${title}</h2><button class="btn primary" onclick="openEntityModal('${key}')">${icon('plus')}${t('add')}</button></div><div class="table-wrap"><table><thead><tr>${fields.map(f => `<th>${f}</th>`).join('')}<th></th></tr></thead><tbody>${state.db[key].map(item => `<tr>${fields.map(f => `<td>${escapeHtml(item[f])}</td>`).join('')}<td><button class="btn icon-only danger" onclick="deleteEntity('${key}','${item.id}')">${icon('trash')}</button></td></tr>`).join('')}</tbody></table></div></div>`;
+
+    async function handleAuthSubmit(event) {
+      event.preventDefault();
+      const email = $("#authEmail").value.trim();
+      const password = $("#authPassword").value;
+      setAuthMessage("Connecting to Supabase Auth...");
+      try {
+        const result = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (result.error) throw result.error;
+        if (result.data.session) {
+          await activateSession(result.data.session);
+          toast(`Welcome ${state.profile?.full_name || email}`);
+        } else {
+          setAuthMessage("Login did not return a session. Check the Supabase Auth user.");
+        }
+      } catch (error) {
+        setAuthMessage(error.message || "Authentication failed.", true);
+      }
     }
-    function listPanel(key, title) {
-      return `<div class="panel"><div class="search-row"><h2>${title}</h2><button class="btn primary" onclick="openListModal('${key}')">${icon('plus')}${t('add')}</button></div><div class="table-wrap"><table><tbody>${state.db[key].map(item => `<tr><td>${escapeHtml(item)}</td><td><button class="btn icon-only danger" onclick="deleteListItem('${key}','${escapeHtml(item)}')">${icon('trash')}</button></td></tr>`).join('')}</tbody></table></div></div>`;
+
+    async function signOut() {
+      await supabaseClient.auth.signOut();
+      state.session = null;
+      state.user = null;
+      state.profile = null;
+      state.data = structuredClone(emptyData);
+      state.cart = [];
+      if (state.realtimeChannel) supabaseClient.removeChannel(state.realtimeChannel);
+      state.realtimeChannel = null;
+      document.body.classList.remove("authenticated");
+      setAuthMessage("Signed out.");
+    }
+
+    function buildNav() {
+      $("#nav").innerHTML = navItems.map(([key, icon, label]) => `
+        <button class="${state.page === key ? "active" : ""}" data-page-target="${key}">
+          <span class="icon">${icon}</span><span>${label}</span>${key === "credits" ? `<span class="count">${openCredits().length}</span>` : ""}
+        </button>
+      `).join("");
+    }
+
+    function navigate(page) {
+      state.page = page;
+      $$(".section").forEach(section => section.classList.toggle("active", section.dataset.page === page));
+      buildNav();
+      document.body.classList.remove("nav-open");
+    }
+
+    function filterRows(items, fields) {
+      const q = state.search.toLowerCase().trim();
+      if (!q) return items;
+      return items.filter(item => fields.some(field => String(item[field] || "").toLowerCase().includes(q)));
+    }
+
+    function openCredits() {
+      return state.data.credits.filter(c => !deletedStatuses.has(String(c.status || "").toLowerCase()) && c.status === "open" && Number(c.balance) > 0);
+    }
+
+    function activeSales() {
+      return state.data.sales.filter(sale => !deletedStatuses.has(String(sale.status || "").toLowerCase()));
+    }
+
+    function saleDate(sale) {
+      return new Date(sale.created_at || sale.date || Date.now());
+    }
+
+    function dateOnly(date) {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+
+    function endOfDate(date) {
+      const d = new Date(date);
+      d.setHours(23, 59, 59, 999);
+      return d;
+    }
+
+    function reportRange() {
+      const now = new Date();
+      if (state.reportMode === "week") {
+        const start = dateOnly(now);
+        start.setDate(start.getDate() - start.getDay());
+        const end = endOfDate(start);
+        end.setDate(start.getDate() + 6);
+        return { start, end, label: "This Week" };
+      }
+      if (state.reportMode === "custom") {
+        const start = state.reportStart ? dateOnly(state.reportStart) : null;
+        const end = state.reportEnd ? endOfDate(state.reportEnd) : null;
+        return { start, end, label: "Selected Dates" };
+      }
+      if (state.reportMode === "all") return { start: null, end: null, label: "All Active Sales" };
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      return { start, end, label: "This Month" };
+    }
+
+    function salesInRange(sales, range) {
+      return sales.filter(sale => {
+        const d = saleDate(sale);
+        if (range.start && d < range.start) return false;
+        if (range.end && d > range.end) return false;
+        return true;
+      });
+    }
+
+    function lowStockProducts() {
+      return state.data.products.filter(p => Number(p.stock_qty) <= Number(p.reorder_level));
+    }
+
+    function renderKpis() {
+      const today = dateOnly(new Date());
+      const revenue = activeSales().filter(sale => saleDate(sale) >= today).reduce((sum, sale) => sum + Number(sale.total || 0), 0);
+      const stockValue = state.data.products.reduce((sum, product) => sum + Number(product.stock_qty || 0) * Number(product.unit_cost || 0), 0);
+      const creditBalance = openCredits().reduce((sum, credit) => sum + Number(credit.balance || 0), 0);
+      const cards = [
+        ["Today Revenue", money(revenue), `${activeSales().length} active sales`],
+        ["Inventory Value", money(stockValue), `${state.data.products.length} active SKUs`],
+        ["Open Credits", money(creditBalance), `${openCredits().length} accounts`],
+        ["Low Stock", lowStockProducts().length, "Needs reorder attention"]
+      ];
+      $("#kpis").innerHTML = cards.map(card => `
+        <div class="card kpi-card">
+          <div class="kpi-label">${card[0]}</div>
+          <div class="kpi-value">${card[1]}</div>
+          <div class="kpi-note">${card[2]}</div>
+        </div>
+      `).join("");
+    }
+
+    function renderActivity(target, limit) {
+      const logs = [...state.data.activity_logs].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, limit || 50);
+      $(target).innerHTML = logs.map(log => `
+        <div class="activity">
+          <div class="bubble">A</div>
+          <div><strong>${log.action}</strong><br><span class="sub">${log.actor} - ${log.entity_type || "system"}</span></div>
+          <span class="badge blue">${new Date(log.created_at).toLocaleDateString()}</span>
+        </div>
+      `).join("");
+    }
+
+    function renderScanHistory() {
+      const scans = [...(state.data.scan_history || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 40);
+      $("#scanHistoryTable").innerHTML = `
+        <thead><tr><th>Barcode</th><th>Product</th><th>Context</th><th>Qty</th><th>Source</th><th>Device</th><th>Time</th></tr></thead>
+        <tbody>${scans.map(scan => {
+          const product = byId(state.data.products, scan.product_id).name || "Unknown / New Product";
+          return `<tr><td><span class="badge pink">${scan.barcode}</span></td><td>${product}</td><td>${scan.scan_context}</td><td>${scan.quantity}</td><td>${scan.source_type || "pending"} ${scan.source_id || ""}</td><td><span class="badge blue">${scan.device_type || "keyboard"}</span></td><td>${new Date(scan.created_at).toLocaleString()}</td></tr>`;
+        }).join("")}</tbody>
+      `;
+    }
+
+    function renderProducts() {
+      let products = filterRows(state.data.products, ["name", "sku", "brand", "flavor", "barcode"]);
+      if (state.categoryFilter !== "all") products = products.filter(product => product.category_id === state.categoryFilter);
+      products = [...products].sort((a, b) => {
+        if (state.productSort === "stock_low") return Number(a.stock_qty) - Number(b.stock_qty);
+        if (state.productSort === "price_high") return Number(b.retail_price) - Number(a.retail_price);
+        if (state.productSort === "price_low") return Number(a.retail_price) - Number(b.retail_price);
+        return String(a.name).localeCompare(String(b.name));
+      });
+      $("#productGrid").innerHTML = products.map(product => {
+        const cat = byId(state.data.categories, product.category_id).name || "Uncategorized";
+        const stockClass = product.stock_qty <= product.reorder_level ? "red" : "green";
+        return `
+          <article class="card product">
+            <div class="product-art">${product.icon || "P"}</div>
+            <div class="product-body">
+              <div class="product-row"><span class="badge blue">${cat}</span><span class="badge ${stockClass}">${product.stock_qty} in stock</span></div>
+              <h3 style="margin-top:12px">${product.name}</h3>
+              <p>${product.description || "Cloud11 catalog product."}<br><span class="badge pink">${product.barcode || "No barcode"}</span></p>
+              <div class="product-row"><span class="price">${money(product.retail_price)}</span><button class="btn" data-add-cart="${product.id}">Add</button></div>
+              <button class="btn danger" style="width:100%; margin-top:10px" data-faulty-product="${product.id}">Report Faulty</button>
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function renderInventory() {
+      const rows = filterRows(state.data.products, ["name", "sku", "brand", "barcode"]);
+      $("#inventoryTable").innerHTML = `
+        <thead><tr><th>Barcode</th><th>SKU</th><th>Product</th><th>Supplier</th><th>Stock</th><th>Reorder</th><th>Cost</th><th>Retail</th><th>Status</th></tr></thead>
+        <tbody>${rows.map(p => {
+          const supplier = byId(state.data.suppliers, p.supplier_id).name || "No supplier";
+          const status = p.stock_qty <= p.reorder_level ? ["red", "Low Stock"] : ["green", "Healthy"];
+          return `<tr><td><span class="badge blue">${p.barcode || "No barcode"}</span></td><td>${p.sku}</td><td><strong>${p.name}</strong><br><span class="sub">${p.brand} - ${p.flavor} - ${p.variant || "Standard"}</span></td><td>${supplier}</td><td>${p.stock_qty}</td><td>${p.reorder_level}</td><td>${money(p.unit_cost)}</td><td>${money(p.retail_price)}</td><td><span class="badge ${status[0]}">${status[1]}</span></td></tr>`;
+        }).join("")}</tbody>
+      `;
+      renderFaultyReturns();
+    }
+
+    function faultyReturns() {
+      return state.data.inventory_history.filter(row => String(row.source_type || "").toLowerCase() === "faulty_return" || String(row.reason || "").toLowerCase().includes("faulty"));
+    }
+
+    function faultyDetails(row) {
+      const reason = String(row.reason || "");
+      const costMatch = reason.match(/cost:\s*([0-9.]+)/i);
+      const outcomeMatch = reason.match(/outcome:\s*([^|]+)/i);
+      const notesMatch = reason.match(/notes:\s*(.+)$/i);
+      return {
+        cost: Number(costMatch?.[1] || 0),
+        outcome: (outcomeMatch?.[1] || "faulty").trim(),
+        notes: (notesMatch?.[1] || reason).trim()
+      };
+    }
+
+    function renderFaultyReturns() {
+      const rows = [...faultyReturns()].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      $("#faultyReturnsTable").innerHTML = `
+        <thead><tr><th>Date</th><th>Product</th><th>Qty</th><th>Cost</th><th>Outcome</th><th>Notes</th></tr></thead>
+        <tbody>${rows.map(row => {
+          const product = byId(state.data.products, row.product_id).name || "Unknown product";
+          const detail = faultyDetails(row);
+          return `<tr><td>${new Date(row.created_at).toLocaleDateString()}</td><td><strong>${product}</strong><br><span class="sub">${row.barcode || ""}</span></td><td>${Math.abs(Number(row.change_qty || 0))}</td><td>${money(detail.cost)}</td><td><span class="badge red">${detail.outcome}</span></td><td>${detail.notes}</td></tr>`;
+        }).join("")}</tbody>
+      `;
+    }
+
+    function renderCustomers() {
+      const rows = filterRows(state.data.customers, ["name", "phone", "address"]);
+      $("#customersTable").innerHTML = `
+        <thead><tr><th>Name</th><th>Phone</th><th>Address</th><th>Credit Limit</th><th>Lifetime</th><th>Status</th></tr></thead>
+        <tbody>${rows.map(c => `<tr><td><strong>${c.name}</strong></td><td>${c.phone || "Counter"}</td><td>${c.address || ""}</td><td>${money(c.credit_limit)}</td><td>${money(c.lifetime_value)}</td><td><span class="badge green">${c.status}</span></td></tr>`).join("")}</tbody>
+      `;
+    }
+
+    function renderSuppliers() {
+      $("#suppliersTable").innerHTML = `
+        <thead><tr><th>Supplier</th><th>Contact</th><th>Phone</th><th>Email</th><th>Lead Time</th><th>Status</th></tr></thead>
+        <tbody>${state.data.suppliers.map(s => `<tr><td><strong>${s.name}</strong></td><td>${s.contact_name}</td><td>${s.phone}</td><td>${s.email}</td><td>${s.lead_time_days} days</td><td><span class="badge green">${s.status}</span></td></tr>`).join("")}</tbody>
+      `;
+    }
+
+    function renderCredits() {
+      $("#creditsTable").innerHTML = `
+        <thead><tr><th>Customer</th><th>Original</th><th>Balance</th><th>Due Date</th><th>Status</th><th>Risk</th><th>Action</th></tr></thead>
+        <tbody>${openCredits().map(c => {
+          const customer = byId(state.data.customers, c.customer_id).name || "Unknown";
+          const overdue = new Date(c.due_date) < new Date();
+          return `<tr><td><strong>${customer}</strong></td><td>${money(c.original_amount)}</td><td>${money(c.balance)}</td><td>${c.due_date}</td><td><span class="badge yellow">${c.status}</span></td><td><span class="badge ${overdue ? "red" : "blue"}">${overdue ? "Overdue" : "Scheduled"}</span></td><td><button class="btn" data-pay-credit="${c.id}">Pay</button> <button class="btn danger" data-delete-credit="${c.id}">Delete</button></td></tr>`;
+        }).join("")}</tbody>
+      `;
     }
 
     function renderReports() {
-      const filtered = filterPayments();
-      const crewRows = visibleCrew();
-      const vessels = visibleVessels();
-      document.getElementById('reports').innerHTML = `
-        <div class="panel">
-          <div class="two">
-            <div class="field"><label>${t('sailor')}</label><select onchange="state.reportFilter.sailorName=this.value;renderReports()"><option value="">${t('all')}</option>${crewRows.map(c => `<option ${state.reportFilter.sailorName === c.name ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></div>
-            <div class="field"><label>${t('vessel')}</label><select onchange="state.reportFilter.vessel=this.value;renderReports()"><option value="">${t('all')}</option>${vessels.map(v => `<option ${state.reportFilter.vessel === v.name ? 'selected' : ''}>${escapeHtml(v.name)}</option>`).join('')}</select></div>
-            <div class="field"><label>${t('concept')}</label><select onchange="state.reportFilter.concept=this.value;renderReports()"><option value="">${t('all')}</option>${state.db.concepts.map(c => `<option ${state.reportFilter.concept === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}</select></div>
-            <div class="field"><label>${state.lang === 'es' ? 'Desde' : 'From'}</label><input type="date" value="${state.reportFilter.from || ''}" onchange="state.reportFilter.from=this.value;renderReports()"></div>
-          </div>
-          <canvas class="chart" id="reportChart" width="900" height="260"></canvas>
-          <div class="actions" style="margin-top:14px"><button class="btn" onclick="exportCsv(filterPayments())">${icon('download')}${t('exportExcel')}</button><button class="btn" onclick="window.print()">${icon('print')}${t('exportPdf')}</button></div>
-          ${paymentsTable(filtered)}
-        </div>`;
-      drawChart(filtered);
-    }
-    function filterPayments() {
-      return visiblePayments().filter(p => {
-        const f = state.reportFilter;
-        return (!f.sailorName || p.sailorName === f.sailorName) && (!f.vessel || p.vessel === f.vessel) && (!f.concept || p.concept === f.concept) && (!f.from || p.date >= f.from);
+      const range = reportRange();
+      const sales = salesInRange(activeSales(), range);
+      const saleIds = new Set(sales.map(sale => sale.id));
+      const items = state.data.sale_items.filter(item => saleIds.has(item.sale_id));
+      const revenue = sales.reduce((sum, sale) => sum + Number(sale.total || 0), 0);
+      const cogs = items.reduce((sum, item) => {
+        const product = byId(state.data.products, item.product_id);
+        return sum + Number(item.quantity || 0) * Number(product.unit_cost || 0);
+      }, 0);
+      const margin = revenue - cogs;
+      const best = [...items].sort((a, b) => b.line_total - a.line_total)[0];
+      const bestProduct = best ? byId(state.data.products, best.product_id).name : "No sales yet";
+      const faults = faultyReturns().filter(row => {
+        const d = new Date(row.created_at || Date.now());
+        if (range.start && d < range.start) return false;
+        if (range.end && d > range.end) return false;
+        return true;
       });
-    }
-    function paymentsTable(rows) {
-      return `<div class="table-wrap"><table><thead><tr><th>#</th><th>${t('date')}</th><th>${t('sailor')}</th><th>${t('vessel')}</th><th>${t('captain')}</th><th>${t('concept')}</th><th>${t('total')}</th></tr></thead><tbody>${rows.map(p => `<tr><td>${p.number}</td><td>${p.date}</td><td>${escapeHtml(p.sailorName)}</td><td>${escapeHtml(p.vessel)}</td><td>${escapeHtml(p.captain)}</td><td>${escapeHtml(p.concept)}</td><td>${money(p.total)}</td></tr>`).join('') || `<tr><td colspan="7">Sin datos</td></tr>`}</tbody></table></div>`;
-    }
-    function drawChart(rows) {
-      const canvas = document.getElementById('reportChart');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      const group = rows.reduce((m,p)=>{m[p.concept]=(m[p.concept]||0)+paymentTotal(p);return m;},{});
-      const entries = Object.entries(group).slice(0,8);
-      const max = Math.max(1, ...entries.map(e=>e[1]));
-      ctx.fillStyle = '#101828'; ctx.font = '16px sans-serif'; ctx.fillText(state.lang === 'es' ? 'Pagos por concepto' : 'Payments by concept', 24, 32);
-      entries.forEach(([label,value], i) => {
-        const y = 60 + i * 24;
-        ctx.fillStyle = '#eaf3ff'; ctx.fillRect(150, y - 14, 680, 16);
-        ctx.fillStyle = i % 2 ? '#0757b7' : '#002856'; ctx.fillRect(150, y - 14, 680 * value / max, 16);
-        ctx.fillStyle = '#344054'; ctx.font = '12px sans-serif'; ctx.fillText(label, 24, y); ctx.fillText(money(value), 840, y);
-      });
-    }
-
-    function renderSettings() {
-      const connectedHost = APP_SUPABASE_CONFIG.url.replace('https://', '');
-      document.getElementById('settings').innerHTML = `
-        <div class="grid content-grid">
-          <div class="panel">
-            <h2>${t('settings')}</h2>
-            <p>${state.lang === 'es' ? 'Conexion activa con Supabase.' : 'Active Supabase connection.'}</p>
-            <div class="note">${connectedHost}</div>
-            <div class="form">
-              <div class="note">${isAdmin() ? t('adminAccessNote') : t('accessNote')}</div>
-              <div class="actions"><button class="btn" type="button" onclick="syncSupabase(true)">${icon('sync')}${t('syncNow')}</button></div>
-            </div>
-          </div>
-          <div class="panel">
-            <h2>Login Supabase</h2>
-            <p>${state.session?.user?.email ? escapeHtml(state.session.user.email) : 'Sin sesion iniciada'}</p>
-            <form class="form" id="loginForm">
-              <div class="field"><label>${t('email')}</label><input name="email" type="email" autocomplete="username"></div>
-              <div class="field"><label>Password</label><input name="password" type="password" autocomplete="current-password"></div>
-              <div class="actions"><button class="btn" type="button" onclick="signOutSupabase()">Cerrar sesion</button><button class="btn primary">Login</button></div>
-            </form>
-          </div>
+      const faultyUnits = faults.reduce((sum, row) => sum + Math.abs(Number(row.change_qty || 0)), 0);
+      const faultyCost = faults.reduce((sum, row) => sum + faultyDetails(row).cost, 0);
+      const reports = [
+        ["Gross Sales", money(revenue), `${range.label}. Deleted or voided sales are excluded.`, "blue"],
+        ["Estimated Margin", money(margin), `${revenue ? Math.round((margin / revenue) * 100) : 0}% blended margin across sold items.`, "green"],
+        ["Top Product", bestProduct, "Based on current sale_items line totals.", "pink"],
+        ["Credit Exposure", money(openCredits().reduce((s, c) => s + Number(c.balance), 0)), "Open customer receivables requiring follow-up.", "yellow"],
+        ["Faulty Vapes", faultyUnits, `${money(faultyCost)} estimated loss in this range.`, "red"],
+        ["Active Sales Count", sales.length, "Sales in this report range after deleted/voided rows are removed.", "blue"]
+      ];
+      $("#reportsGrid").innerHTML = reports.map(r => `
+        <div class="card pad">
+          <span class="badge ${r[3]}">${r[0]}</span>
+          <div class="kpi-value">${r[1]}</div>
+          <p class="sub">${r[2]}</p>
         </div>
-        <div class="panel" style="margin-top:18px"><h2>Auditoria</h2><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Accion</th><th>Detalle</th><th>Rol</th></tr></thead><tbody>${state.db.audit.map(a => `<tr><td>${new Date(a.at).toLocaleString()}</td><td>${escapeHtml(a.action)}</td><td>${escapeHtml(a.detail)}</td><td>${escapeHtml(a.role)}</td></tr>`).join('')}</tbody></table></div></div>`;
-      document.getElementById('loginForm').addEventListener('submit', async e => {
-        e.preventDefault();
-        const data = Object.fromEntries(new FormData(e.target));
-        await signInSupabase(data.email, data.password);
-      });
+      `).join("");
     }
 
-    function sqlSchema() {
-      return `create table captains (id text primary key, auth_user_id uuid unique, name text not null, phone text, email text);
-create table vessels (id text primary key, captain_id text references captains(id), name text not null, captain text, season text);
-create table crew (id text primary key, captain_id text references captains(id), vessel_id text references vessels(id), name text not null, dni text, phone text, vessel text, role text, active boolean default true);
-create table roles (value text primary key);
-create table concepts (value text primary key);
-create table admin_users (auth_user_id uuid primary key, name text);
-create table payments (
-  id text primary key,
-  captain_id text references captains(id),
-  vessel_id text references vessels(id),
-  number text unique,
-  sailor_name text not null,
-  dni text,
-  vessel text,
-  captain text,
-  concept text,
-  date date,
-  quantity numeric,
-  price numeric,
-  total numeric,
-  notes text,
-  photo text,
-  signature text,
-  created_at timestamptz default now()
-);
-create table audit (id text primary key, action text, detail text, role text, at timestamptz default now());
-
-alter table captains enable row level security;
-alter table vessels enable row level security;
-alter table crew enable row level security;
-alter table payments enable row level security;
-alter table admin_users enable row level security;
-
-create policy "admin sees own admin row" on admin_users
-  for select using (auth.uid() = auth_user_id);
-
-create policy "admins manage captains" on captains
-  for all using (exists (select 1 from admin_users where auth_user_id = auth.uid()))
-  with check (exists (select 1 from admin_users where auth_user_id = auth.uid()));
-
-create policy "admins manage vessels" on vessels
-  for all using (exists (select 1 from admin_users where auth_user_id = auth.uid()))
-  with check (exists (select 1 from admin_users where auth_user_id = auth.uid()));
-
-create policy "admins manage crew" on crew
-  for all using (exists (select 1 from admin_users where auth_user_id = auth.uid()))
-  with check (exists (select 1 from admin_users where auth_user_id = auth.uid()));
-
-create policy "admins manage payments" on payments
-  for all using (exists (select 1 from admin_users where auth_user_id = auth.uid()))
-  with check (exists (select 1 from admin_users where auth_user_id = auth.uid()));
-
-create policy "captain sees own profile" on captains
-  for select using (auth.uid() = auth_user_id);
-
-create policy "captain sees own vessels" on vessels
-  for select using (captain_id in (select id from captains where auth_user_id = auth.uid()));
-
-create policy "captain manages own crew" on crew
-  for all using (captain_id in (select id from captains where auth_user_id = auth.uid()))
-  with check (captain_id in (select id from captains where auth_user_id = auth.uid()));
-
-create policy "captain manages own payments" on payments
-  for all using (captain_id in (select id from captains where auth_user_id = auth.uid()))
-  with check (captain_id in (select id from captains where auth_user_id = auth.uid()));`;
+    function renderPos() {
+      $("#saleCustomer").innerHTML = state.data.customers.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+      $("#posProductCount").textContent = `${state.data.products.length} products`;
+      $("#posProducts").innerHTML = filterRows(state.data.products, ["name", "sku", "brand"]).map(p => `
+        <button class="card pos-item" data-add-cart="${p.id}">
+          <span class="badge ${p.stock_qty <= p.reorder_level ? "red" : "blue"}">${p.stock_qty} left</span>
+          <strong>${p.icon || "P"} ${p.name}</strong>
+          <span class="price">${money(p.retail_price)}</span>
+        </button>
+      `).join("");
+      renderCart();
+      renderSalesHistory();
     }
 
-    function openEntityModal(key) {
-      const fieldsByKey = {
-        crew: ['name','dni','phone','vessel','role'],
-        vessels: ['name','captain','season'],
-        captains: ['name','phone','email','authUserId']
+    function renderSalesHistory() {
+      const rows = [...state.data.sales].sort((a, b) => saleDate(b) - saleDate(a));
+      $("#salesHistoryCount").textContent = `${activeSales().length} active`;
+      $("#salesHistoryTable").innerHTML = `
+        <thead><tr><th>Date</th><th>Customer</th><th>Payment</th><th>Status</th><th>Total</th><th>History</th><th>Action</th></tr></thead>
+        <tbody>${rows.map(sale => {
+          const customer = byId(state.data.customers, sale.customer_id).name || "Walk-in";
+          const status = String(sale.status || "paid");
+          const isDeleted = deletedStatuses.has(status.toLowerCase());
+          return `<tr>
+            <td>${saleDate(sale).toLocaleString()}</td>
+            <td><strong>${customer}</strong></td>
+            <td>${sale.payment_type || "cash"}</td>
+            <td><span class="badge ${isDeleted ? "red" : "green"}">${status}</span></td>
+            <td>${money(sale.total)}</td>
+            <td>${isDeleted ? "Excluded from income" : "Included in income"}</td>
+            <td>${isDeleted ? `<span class="badge red">Deleted</span>` : `<button class="btn danger" data-delete-sale="${sale.id}">Delete</button>`}</td>
+          </tr>`;
+        }).join("")}</tbody>
+      `;
+    }
+
+    function renderCart() {
+      const subtotal = state.cart.reduce((sum, line) => sum + line.quantity * line.product.retail_price, 0);
+      const discount = Number($("#saleDiscount")?.value || 0);
+      const total = Math.max(0, subtotal - discount);
+      $("#cartLines").innerHTML = state.cart.length ? state.cart.map(line => `
+        <div class="cart-line">
+          <div><strong>${line.product.name}</strong><br><span class="sub">${line.quantity} Ã— ${money(line.product.retail_price)}</span></div>
+          <div><strong>${money(line.quantity * line.product.retail_price)}</strong><br><button class="btn" data-remove-cart="${line.product.id}">Remove</button></div>
+        </div>
+      `).join("") : `<p class="sub">Cart is empty.</p>`;
+      $("#cartTotals").innerHTML = `
+        <div class="total-row"><span>Subtotal</span><span>${money(subtotal)}</span></div>
+        <div class="total-row"><span>Discount</span><span>${money(discount)}</span></div>
+        <div class="total-row"><strong>Total</strong><strong>${money(total)}</strong></div>
+      `;
+    }
+
+    function addToCart(productId) {
+      const product = byId(state.data.products, productId);
+      if (!product.id) return;
+      const existing = state.cart.find(line => line.product.id === productId);
+      if (existing) existing.quantity += 1;
+      else state.cart.push({ product, quantity: 1 });
+      renderCart();
+      toast(`${product.name} added to cart`);
+    }
+
+    function removeFromCart(productId) {
+      state.cart = state.cart.filter(line => line.product.id !== productId);
+      renderCart();
+    }
+
+    function findProductByBarcode(barcode) {
+      const clean = String(barcode || "").trim();
+      if (!clean) return null;
+      const variant = state.data.product_variants?.find(item => item.barcode === clean);
+      if (variant) return byId(state.data.products, variant.product_id);
+      return state.data.products.find(product => product.barcode === clean || product.sku === clean) || null;
+    }
+
+    function logScan({ barcode, product, context, sourceType, sourceId, quantity = 1, deviceType = "keyboard" }) {
+      const scan = {
+        id: crypto.randomUUID(),
+        barcode,
+        product_id: product?.id || null,
+        scan_context: context,
+        source_type: sourceType || null,
+        source_id: sourceId || null,
+        quantity,
+        device_type: deviceType,
+        created_at: todayIso()
       };
-      const fields = fieldsByKey[key];
-      openModal(t('add'), key, `<form class="form" id="entityForm">${fields.map(f => `<div class="field"><label>${f}</label><input name="${f}" required></div>`).join('')}<div class="actions"><button class="btn primary">${icon('save')}${t('save')}</button></div></form>`);
-      document.getElementById('entityForm').addEventListener('submit', e => {
-        e.preventDefault();
-        const item = { id: uid(), ...Object.fromEntries(new FormData(e.target)) };
-        if (key === 'crew') {
-          const vessel = isAdmin() ? state.db.vessels.find(v => v.name === item.vessel) : visibleVessels()[0];
-          item.active = true;
-          item.vessel = vessel?.name || item.vessel;
-          item.vesselId = vessel?.id || '';
-          item.captainId = vessel?.captainId || currentCaptainId();
-        }
-        if (key === 'vessels') {
-          const captain = state.db.captains.find(c => c.name === item.captain) || currentCaptain();
-          item.captain = captain.name;
-          item.captainId = captain.id;
-        }
-        state.db[key].push(item);
-        recordAudit(`${key}.created`, item.name);
-        persist();
-        closeModal();
-        renderView();
-      });
-    }
-    function openListModal(key) {
-      openModal(t('add'), key, `<form class="form" id="listForm"><div class="field"><label>${t('name')}</label><input name="value" required></div><div class="actions"><button class="btn primary">${icon('save')}${t('save')}</button></div></form>`);
-      document.getElementById('listForm').addEventListener('submit', e => {
-        e.preventDefault();
-        state.db[key].push(new FormData(e.target).get('value'));
-        recordAudit(`${key}.created`, new FormData(e.target).get('value'));
-        persist();
-        closeModal();
-        renderView();
-      });
-    }
-    function deleteEntity(key, id) {
-      if (!isAdmin() && key !== 'crew') return toast(t('accessNote'));
-      if (!isAdmin() && key === 'crew' && !visibleCrew().some(item => item.id === id)) return toast(t('accessNote'));
-      state.db[key] = state.db[key].filter(item => item.id !== id);
-      recordAudit(`${key}.deleted`, id);
-      persist();
-      renderView();
-    }
-    function deleteListItem(key, value) {
-      state.db[key] = state.db[key].filter(item => item !== value);
-      recordAudit(`${key}.deleted`, value);
-      persist();
-      renderView();
-    }
-    function openModal(title, sub, body) {
-      document.getElementById('modalTitle').textContent = title;
-      document.getElementById('modalSub').textContent = sub;
-      document.getElementById('modalBody').innerHTML = body;
-      document.getElementById('modal').classList.add('open');
-    }
-    function closeModal() { document.getElementById('modal').classList.remove('open'); }
-
-    function exportCsv(rows = visiblePayments()) {
-      const header = ['number','date','sailorName','dni','vessel','captain','concept','quantity','price','total','notes'];
-      const csv = [header.join(','), ...rows.map(p => header.map(h => `"${String(p[h] ?? '').replace(/"/g,'""')}"`).join(','))].join('\n');
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = 'reporte-pagos.csv';
-      link.click();
-      URL.revokeObjectURL(link.href);
+      state.data.scan_history.unshift(scan);
+      if (state.online) db.insert("scan_history", scan).catch(error => console.warn("scan_history insert failed", error));
+      return scan;
     }
 
-    function setupSupabase() {
-      if (!state.config.url || !state.config.key || !window.supabase) return null;
-      state.supabase = window.supabase.createClient(state.config.url, state.config.key);
-      return state.supabase;
+    function openProductFormWithBarcode(barcode) {
+      $("#productBarcode").value = barcode;
+      $("#productSku").value = `C11-SCAN-${String(barcode).slice(-6) || Math.floor(Math.random() * 900000)}`;
+      $("#productModal").classList.add("show");
+      $("#productModal").setAttribute("aria-hidden", "false");
+      $("#productBarcode").focus();
+      toast("Unknown barcode. Product form is ready.");
     }
-    function friendlySupabaseError(error) {
-      const message = error?.message || String(error || '');
-      if (/invalid api key/i.test(message)) {
-        return state.lang === 'es'
-          ? 'API key invalida. Copia la publishable key o anon key correcta de Supabase y reemplaza APP_SUPABASE_CONFIG.key en index.html.'
-          : 'Invalid API key. Copy the correct publishable key or anon key from Supabase and replace APP_SUPABASE_CONFIG.key in index.html.';
-      }
-      return message;
+
+    function closeProductModal() {
+      $("#productModal").classList.remove("show");
+      $("#productModal").setAttribute("aria-hidden", "true");
     }
-    async function hydrateSession() {
-      const client = state.supabase || setupSupabase();
-      if (!client) return;
-      const { data } = await client.auth.getSession();
-      state.session = data.session;
-      updateAuthGate();
-      if (!state.session) return;
-      await applySessionScope();
-      await loadSupabaseData();
-      startRealtime();
-    }
-    async function applySessionScope() {
-      const userId = state.session?.user?.id;
-      if (!userId) return;
-      const client = state.supabase || setupSupabase();
-      if (!client) return;
-      const { data: adminRow } = await client.from('admin_users').select('*').eq('auth_user_id', userId).maybeSingle();
-      if (adminRow) {
-        state.config.role = 'Administrador';
-        localStorage.setItem('cc_config', JSON.stringify(state.config));
+
+    function handleBarcode(barcode, mode, deviceType = "keyboard") {
+      const clean = String(barcode || "").trim();
+      if (!clean) return toast("Scan or enter a barcode first.");
+      const product = findProductByBarcode(clean);
+      if (!product) {
+        logScan({ barcode: clean, context: `${mode}_unknown`, quantity: Number($("#receiveQty")?.value || 1), deviceType });
+        openProductFormWithBarcode(clean);
         return;
       }
-      const captain = state.db.captains.find(c => c.authUserId === userId);
-      if (captain) {
-        state.config.role = 'Capitan';
-        state.config.captainId = captain.id;
-        localStorage.setItem('cc_config', JSON.stringify(state.config));
+      if (mode === "sale") {
+        addToCart(product.id);
+        logScan({ barcode: clean, product, context: "sale_cart", quantity: 1, deviceType });
+        $("#saleBarcode").value = "";
+        navigate("sales");
         return;
       }
-      const { data, error } = await client.from('captains').select('*').eq('auth_user_id', userId).maybeSingle();
-      if (!error && data) {
-        const mapped = { id: data.id, authUserId: data.auth_user_id, name: data.name, phone: data.phone, email: data.email };
-        const existing = state.db.captains.findIndex(c => c.id === mapped.id);
-        if (existing >= 0) state.db.captains[existing] = { ...state.db.captains[existing], ...mapped };
-        else state.db.captains.push(mapped);
-        state.config.role = 'Capitan';
-        state.config.captainId = mapped.id;
-        localStorage.setItem('cc_config', JSON.stringify(state.config));
-        persist();
+      if (mode === "receive") {
+        receiveByBarcode(clean, Number($("#receiveQty").value || 1), deviceType);
+        return;
+      }
+      navigate("products");
+      toast(`Opened ${product.name}`);
+    }
+
+    async function receiveByBarcode(barcode, quantity, deviceType = "keyboard") {
+      const product = findProductByBarcode(barcode);
+      if (!product) return openProductFormWithBarcode(barcode);
+      const qty = Math.max(1, Number(quantity || 1));
+      product.stock_qty = Number(product.stock_qty || 0) + qty;
+      const movement = { id: crypto.randomUUID(), product_id: product.id, barcode, change_qty: qty, reason: "Barcode receiving", source_type: "scan", source_id: null, created_at: todayIso() };
+      state.data.inventory_history.unshift(movement);
+      state.data.activity_logs.unshift({ id: crypto.randomUUID(), actor: "Cloud11 Admin", action: `Received ${qty} units by barcode`, entity_type: "inventory_history", entity_id: movement.id, created_at: todayIso() });
+      logScan({ barcode, product, context: "inventory_receive", sourceType: "inventory_history", sourceId: movement.id, quantity: qty, deviceType });
+      try {
+        if (state.online) {
+          await db.update("products", product.id, { stock_qty: product.stock_qty });
+          await db.insert("inventory_history", movement);
+        }
+      } catch (error) {
+        console.warn(error);
+        toast("Supabase stock update failed; showing local session update.");
+      }
+      $("#receiveBarcode").value = "";
+      renderAll();
+      toast(`${product.name} stock increased by ${qty}.`);
+    }
+
+    let scannerStream = null;
+    let scannerMode = "sale";
+    let scannerActive = false;
+
+    async function startCameraScan(mode) {
+      scannerMode = mode;
+      $("#scannerModal").classList.add("show");
+      $("#scannerModal").setAttribute("aria-hidden", "false");
+      $("#scannerHelp").textContent = mode === "receive" ? "Scan the box barcode, then stock receiving will use the quantity entered." : "Scan a product barcode to add it to the POS cart.";
+      if (!("BarcodeDetector" in window)) {
+        toast("Camera barcode detection is not available in this browser yet. Use the manual field or a USB scanner.");
+        return;
+      }
+      try {
+        scannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+        const video = $("#scannerVideo");
+        video.srcObject = scannerStream;
+        await video.play();
+        scannerActive = true;
+        const detector = new BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "qr_code"] });
+        const tick = async () => {
+          if (!scannerActive) return;
+          try {
+            const results = await detector.detect(video);
+            if (results.length) {
+              stopCameraScan();
+              handleBarcode(results[0].rawValue, scannerMode, "camera");
+              return;
+            }
+          } catch (error) {
+            console.warn(error);
+          }
+          requestAnimationFrame(tick);
+        };
+        tick();
+      } catch (error) {
+        console.warn(error);
+        toast("Camera permission was not available. Manual and USB scanning still work.");
       }
     }
-    async function loadSupabaseData() {
-      const client = state.supabase || setupSupabase();
-      if (!client || !state.session) return;
-      const [captainsRes, vesselsRes, crewRes, paymentsRes, rolesRes, conceptsRes] = await Promise.all([
-        client.from('captains').select('*'),
-        client.from('vessels').select('*'),
-        client.from('crew').select('*'),
-        client.from('payments').select('*').order('created_at', { ascending: false }),
-        client.from('roles').select('*'),
-        client.from('concepts').select('*')
-      ]);
-      if (!captainsRes.error && captainsRes.data?.length) {
-        state.db.captains = captainsRes.data.map(c => ({ id: c.id, authUserId: c.auth_user_id, name: c.name, phone: c.phone, email: c.email }));
-      }
-      if (!vesselsRes.error && vesselsRes.data?.length) {
-        state.db.vessels = vesselsRes.data.map(v => ({ id: v.id, captainId: v.captain_id, name: v.name, captain: v.captain, season: v.season }));
-      }
-      if (!crewRes.error && crewRes.data) {
-        state.db.crew = crewRes.data.map(mapCrewRow);
-      }
-      if (!paymentsRes.error && paymentsRes.data) {
-        state.db.payments = paymentsRes.data.map(mapPaymentRow);
-      }
-      if (!rolesRes.error && rolesRes.data?.length) state.db.roles = rolesRes.data.map(r => r.value);
-      if (!conceptsRes.error && conceptsRes.data?.length) state.db.concepts = conceptsRes.data.map(c => c.value);
-      persist();
-      renderView();
+
+    function stopCameraScan() {
+      scannerActive = false;
+      if (scannerStream) scannerStream.getTracks().forEach(track => track.stop());
+      scannerStream = null;
+      $("#scannerVideo").srcObject = null;
+      $("#scannerModal").classList.remove("show");
+      $("#scannerModal").setAttribute("aria-hidden", "true");
     }
-    function mapCrewRow(c) {
-      return { id: c.id, captainId: c.captain_id, vesselId: c.vessel_id, name: c.name, dni: c.dni, phone: c.phone, vessel: c.vessel, role: c.role, active: c.active };
+
+    const usbScanner = { buffer: "", lastKeyAt: 0 };
+
+    function handleUsbScannerKey(event) {
+      const target = event.target;
+      const typingIntoField = target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
+      const now = Date.now();
+      if (now - usbScanner.lastKeyAt > 90) usbScanner.buffer = "";
+      usbScanner.lastKeyAt = now;
+      if (event.key === "Enter") {
+        const code = usbScanner.buffer.trim();
+        usbScanner.buffer = "";
+        if (code.length >= 6) {
+          event.preventDefault();
+          const mode = state.page === "inventory" ? "receive" : state.page === "sales" ? "sale" : "lookup";
+          handleBarcode(code, mode, "usb");
+        }
+        return;
+      }
+      if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        if (!typingIntoField || target.id === "saleBarcode" || target.id === "receiveBarcode") usbScanner.buffer += event.key;
+      }
     }
-    function mapPaymentRow(p) {
-      return {
-        id: p.id,
-        captainId: p.captain_id,
-        vesselId: p.vessel_id,
-        number: p.number,
-        sailorName: p.sailor_name,
-        dni: p.dni,
-        vessel: p.vessel,
-        captain: p.captain,
-        concept: p.concept,
-        date: p.date,
-        quantity: p.quantity,
-        price: p.price,
-        total: p.total,
-        notes: p.notes,
-        photo: p.photo,
-        signature: p.signature,
-        createdAt: p.created_at,
-        synced: true
+
+    async function checkout() {
+      if (!state.cart.length) return toast("Add products before checkout.");
+      const customerId = $("#saleCustomer").value;
+      const paymentType = $("#paymentType").value;
+      const discount = Number($("#saleDiscount").value || 0);
+      const subtotal = state.cart.reduce((sum, line) => sum + line.quantity * line.product.retail_price, 0);
+      const total = Math.max(0, subtotal - discount);
+      const sale = { id: crypto.randomUUID(), customer_id: customerId, subtotal, discount, tax: 0, total, payment_type: paymentType, status: paymentType === "credit" ? "credit" : "paid", created_at: todayIso() };
+      const items = state.cart.map(line => ({ id: crypto.randomUUID(), sale_id: sale.id, product_id: line.product.id, quantity: line.quantity, unit_price: line.product.retail_price, line_total: line.quantity * line.product.retail_price }));
+      const movements = state.cart.map(line => ({ id: crypto.randomUUID(), product_id: line.product.id, barcode: line.product.barcode || null, change_qty: -line.quantity, reason: "Sale", source_type: "sale", source_id: sale.id, created_at: todayIso() }));
+      const saleScans = state.cart.map(line => ({ id: crypto.randomUUID(), barcode: line.product.barcode || line.product.sku, product_id: line.product.id, scan_context: "sale_checkout", source_type: "sale", source_id: sale.id, quantity: line.quantity, device_type: "checkout", created_at: todayIso() }));
+
+      try {
+        if (state.online) {
+          await db.insert("sales", sale);
+          await db.insert("sale_items", items);
+          await db.insert("inventory_history", movements);
+          await db.insert("scan_history", saleScans);
+          if (paymentType === "credit") {
+            await db.insert("credits", { id: crypto.randomUUID(), customer_id: customerId, sale_id: sale.id, original_amount: total, balance: total, due_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), status: "open" });
+          }
+        }
+      } catch (error) {
+        console.warn(error);
+        toast("Supabase write failed; showing local session update.");
+      }
+
+      state.data.sales.unshift(sale);
+      state.data.sale_items.push(...items);
+      state.data.inventory_history.unshift(...movements);
+      state.data.scan_history.unshift(...saleScans);
+      if (paymentType === "credit") state.data.credits.unshift({ id: crypto.randomUUID(), customer_id: customerId, sale_id: sale.id, original_amount: total, balance: total, due_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), status: "open" });
+      state.cart.forEach(line => {
+        const product = byId(state.data.products, line.product.id);
+        product.stock_qty = Math.max(0, Number(product.stock_qty) - line.quantity);
+      });
+      state.data.activity_logs.unshift({ id: crypto.randomUUID(), actor: "Cloud11 Admin", action: `Completed ${paymentType} sale for ${money(total)}`, entity_type: "sales", entity_id: sale.id, created_at: todayIso() });
+      state.cart = [];
+      renderAll();
+      toast("Sale completed.");
+    }
+
+    async function deleteSale(saleId) {
+      const sale = byId(state.data.sales, saleId);
+      if (!sale.id) return;
+      if (!confirm("Delete this sale from income reports? It will stay in Sales History as deleted.")) return;
+      const deletedAt = todayIso();
+      const payload = { status: "deleted" };
+      const linkedCredits = state.data.credits.filter(credit => credit.sale_id === saleId && !deletedStatuses.has(String(credit.status || "").toLowerCase()));
+      const activity = {
+        id: crypto.randomUUID(),
+        actor: state.profile?.full_name || "Cloud11 Admin",
+        action: `Deleted sale ${saleId} for ${money(sale.total)}`,
+        entity_type: "sales",
+        entity_id: saleId,
+        created_at: deletedAt
       };
-    }
-    function upsertById(list, item) {
-      const index = list.findIndex(row => row.id === item.id);
-      if (index >= 0) list[index] = { ...list[index], ...item };
-      else list.unshift(item);
-    }
-    function startRealtime() {
-      const client = state.supabase || setupSupabase();
-      if (!client || !state.session) return;
-      if (state.realtimeChannel) client.removeChannel(state.realtimeChannel);
-      state.realtimeChannel = client
-        .channel('capitan-control-live')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, payload => {
-          if (payload.eventType === 'DELETE') state.db.payments = state.db.payments.filter(p => p.id !== payload.old.id);
-          else upsertById(state.db.payments, mapPaymentRow(payload.new));
-          persist();
-          renderView();
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'crew' }, payload => {
-          if (payload.eventType === 'DELETE') state.db.crew = state.db.crew.filter(c => c.id !== payload.old.id);
-          else upsertById(state.db.crew, mapCrewRow(payload.new));
-          persist();
-          renderView();
-        })
-        .subscribe();
-    }
-    async function signInSupabase(email, password) {
-      const client = state.supabase || setupSupabase();
-      if (!client) {
-        const msg = state.lang === 'es' ? 'No se pudo conectar con Supabase.' : 'Could not connect to Supabase.';
-        setLoginMessage(msg);
-        return toast(msg);
-      }
-      state.session = null;
-      state.config.role = 'Consulta';
-      localStorage.setItem('cc_config', JSON.stringify(state.config));
-      updateAuthGate();
-      renderView();
-      const { data, error } = await client.auth.signInWithPassword({ email, password });
-      if (error) {
-        const msg = friendlySupabaseError(error);
-        setLoginMessage(msg);
-        return toast(msg);
-      }
-      state.session = data.session;
-      updateAuthGate();
-      setLoginMessage('');
-      await applySessionScope();
-      await loadSupabaseData();
-      startRealtime();
-      toast('Login OK');
-      go('dashboard');
-    }
-    async function signOutSupabase() {
-      const client = state.supabase || setupSupabase();
-      if (client && state.realtimeChannel) client.removeChannel(state.realtimeChannel);
-      state.realtimeChannel = null;
-      if (client) await client.auth.signOut();
-      state.session = null;
-      updateAuthGate();
-      toast('Sesion cerrada');
-      renderView();
-    }
-    async function syncSupabase(forceToast = false) {
-      const client = state.supabase || setupSupabase();
-      if (!client || !navigator.onLine) {
-        if (forceToast) toast(state.lang === 'es' ? 'Configura Supabase y verifica internet' : 'Configure Supabase and check internet');
+      try {
+        if (state.online) {
+          await db.update("sales", saleId, payload);
+          for (const credit of linkedCredits) await db.update("credits", credit.id, { status: "deleted" });
+          await db.insert("activity_logs", activity);
+        }
+      } catch (error) {
+        console.warn(error);
+        toast("Supabase delete update failed.");
         return;
       }
-      if (isAdmin()) {
-        await client.from('captains').upsert(state.db.captains.map(c => ({ id: c.id, auth_user_id: c.authUserId || null, name: c.name, phone: c.phone, email: c.email })));
-        await client.from('vessels').upsert(state.db.vessels.map(v => ({ id: v.id, captain_id: v.captainId, name: v.name, captain: v.captain, season: v.season })));
-        await client.from('roles').upsert(state.db.roles.map(value => ({ value })));
-        await client.from('concepts').upsert(state.db.concepts.map(value => ({ value })));
-      }
-      await client.from('crew').upsert(visibleCrew().map(c => ({ id: c.id, captain_id: c.captainId, vessel_id: c.vesselId, name: c.name, dni: c.dni, phone: c.phone, vessel: c.vessel, role: c.role, active: c.active })));
-      const pending = visiblePayments().filter(p => !p.synced);
-      if (!pending.length) {
-        if (forceToast) toast(t('synced'));
+      sale.status = "deleted";
+      linkedCredits.forEach(credit => { credit.status = "deleted"; });
+      state.data.activity_logs.unshift(activity);
+      renderAll();
+      toast("Sale deleted from income reports.");
+    }
+
+    async function deleteCredit(creditId) {
+      const credit = byId(state.data.credits, creditId);
+      if (!credit.id) return;
+      if (!confirm("Delete this credit from open receivables? It will be excluded from credit totals.")) return;
+      const activity = {
+        id: crypto.randomUUID(),
+        actor: state.profile?.full_name || "Cloud11 Admin",
+        action: `Deleted credit ${creditId} for ${money(credit.balance)}`,
+        entity_type: "credits",
+        entity_id: creditId,
+        created_at: todayIso()
+      };
+      try {
+        if (state.online) {
+          await db.update("credits", creditId, { status: "deleted" });
+          await db.insert("activity_logs", activity);
+        }
+      } catch (error) {
+        console.warn(error);
+        toast("Supabase credit update failed.");
         return;
       }
-      const payload = pending.map(p => ({
-        id: p.id, captain_id: p.captainId, vessel_id: p.vesselId, number: p.number, sailor_name: p.sailorName, dni: p.dni, vessel: p.vessel,
-        captain: p.captain, concept: p.concept, date: p.date, quantity: p.quantity,
-        price: p.price, total: p.total, notes: p.notes, photo: p.photo, signature: p.signature, created_at: p.createdAt
-      }));
-      const { error } = await client.from('payments').upsert(payload);
-      if (error) {
-        toast(error.message);
+      credit.status = "deleted";
+      state.data.activity_logs.unshift(activity);
+      renderAll();
+      toast("Credit deleted from open receivables.");
+    }
+
+    async function refreshData() {
+      try {
+        const loaded = {};
+        const loadable = ["categories", "suppliers", "customers", "products", "product_variants", "sales", "sale_items", "credits", "credit_payments", "inventory_history", "purchases", "purchase_items", "notifications", "activity_logs", "scan_history", "settings", "product_images"];
+        const orderBy = {
+          categories: "name",
+          suppliers: "name",
+          customers: "name",
+          products: "name",
+          product_variants: "name",
+          sales: "created_at",
+          credits: "created_at",
+          credit_payments: "created_at",
+          inventory_history: "created_at",
+          purchases: "ordered_at",
+          purchase_items: "id",
+          sale_items: "id",
+          notifications: "created_at",
+          activity_logs: "created_at",
+          scan_history: "created_at",
+          settings: "key",
+          product_images: "sort_order"
+        };
+        for (const table of loadable) loaded[table] = await db.list(table, { order: orderBy[table], ascending: ["categories", "suppliers", "customers", "products", "product_variants", "settings", "product_images"].includes(table) });
+        state.data = { ...structuredClone(emptyData), ...loaded };
+        setStatus(true, "Supabase Live");
+        db.subscribe();
+      } catch (error) {
+        state.data = structuredClone(emptyData);
+        setStatus(false, "Setup Needed");
+        toast("Supabase tables or permissions need attention.");
+        console.warn("Supabase live data load failed:", error.message);
+      }
+      renderAll();
+    }
+
+    function renderAll() {
+      buildNav();
+      renderKpis();
+      renderActivity("#recentActivity", 5);
+      renderActivity("#activityLog");
+      renderScanHistory();
+      renderProducts();
+      renderInventory();
+      renderCustomers();
+      renderSuppliers();
+      renderCredits();
+      renderReports();
+      renderPos();
+      $("#supabaseUrl").value = SUPABASE_URL;
+      $("#supabaseKey").value = SUPABASE_ANON_KEY;
+      $("#productCategory").innerHTML = `<option value="">No category</option>` + state.data.categories.map(category => `<option value="${category.id}">${category.name}</option>`).join("");
+      $("#productSupplier").innerHTML = `<option value="">No supplier</option>` + state.data.suppliers.map(supplier => `<option value="${supplier.id}">${supplier.name}</option>`).join("");
+      $("#categoryFilter").innerHTML = `<option value="all">All Categories</option>` + state.data.categories.map(category => `<option value="${category.id}">${category.name}</option>`).join("");
+      $("#categoryFilter").value = state.categoryFilter;
+      $("#productSort").value = state.productSort;
+      $("#reportMode").value = state.reportMode;
+      if (!state.reportStart || !state.reportEnd) {
+        const now = new Date();
+        state.reportStart ||= new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+        state.reportEnd ||= now.toISOString().slice(0, 10);
+      }
+      $("#reportStart").value = state.reportStart;
+      $("#reportEnd").value = state.reportEnd;
+    }
+
+    function addProductQuick() {
+      const barcode = `850001${Math.floor(100000 + Math.random() * 899999)}`;
+      openProductFormWithBarcode(barcode);
+    }
+
+    function receiveStockQuick() {
+      lowStockProducts().forEach(product => product.stock_qty += 10);
+      state.data.activity_logs.unshift({ id: crypto.randomUUID(), actor: "Cloud11 Admin", action: "Received quick reorder stock", entity_type: "inventory_history", entity_id: crypto.randomUUID(), created_at: todayIso() });
+      renderAll();
+      toast("Low stock products received +10 units.");
+    }
+
+    function openPaymentModal(creditId) {
+      const credits = openCredits();
+      if (!credits.length) return toast("No open credits to pay.");
+      $("#paymentCredit").innerHTML = credits.map(credit => {
+        const customer = byId(state.data.customers, credit.customer_id).name || "Unknown";
+        return `<option value="${credit.id}">${customer} - balance ${money(credit.balance)}</option>`;
+      }).join("");
+      const selected = creditId || credits[0].id;
+      $("#paymentCredit").value = selected;
+      const credit = byId(credits, selected);
+      $("#paymentAmount").value = credit.balance || "";
+      $("#paymentModal").classList.add("show");
+      $("#paymentModal").setAttribute("aria-hidden", "false");
+      $("#paymentAmount").focus();
+    }
+
+    function closePaymentModal() {
+      $("#paymentModal").classList.remove("show");
+      $("#paymentModal").setAttribute("aria-hidden", "true");
+    }
+
+    function openFaultyModal(productId) {
+      if (!state.data.products.length) return toast("Add products before reporting faulty returns.");
+      $("#faultyProduct").innerHTML = state.data.products.map(product => `<option value="${product.id}">${product.name}</option>`).join("");
+      $("#faultyCustomer").innerHTML = `<option value="">No customer selected</option>` + state.data.customers.map(customer => `<option value="${customer.id}">${customer.name}</option>`).join("");
+      if (productId) $("#faultyProduct").value = productId;
+      $("#faultyModal").classList.add("show");
+      $("#faultyModal").setAttribute("aria-hidden", "false");
+    }
+
+    function closeFaultyModal() {
+      $("#faultyModal").classList.remove("show");
+      $("#faultyModal").setAttribute("aria-hidden", "true");
+    }
+
+    document.addEventListener("click", event => {
+      const navButton = event.target.closest("[data-page-target]");
+      if (navButton) navigate(navButton.dataset.pageTarget);
+
+      const jump = event.target.closest("[data-jump]");
+      if (jump) navigate(jump.dataset.jump);
+
+      const add = event.target.closest("[data-add-cart]");
+      if (add) addToCart(add.dataset.addCart);
+
+      const remove = event.target.closest("[data-remove-cart]");
+      if (remove) removeFromCart(remove.dataset.removeCart);
+
+      const deleteSaleButton = event.target.closest("[data-delete-sale]");
+      if (deleteSaleButton) deleteSale(deleteSaleButton.dataset.deleteSale);
+
+      const deleteCreditButton = event.target.closest("[data-delete-credit]");
+      if (deleteCreditButton) deleteCredit(deleteCreditButton.dataset.deleteCredit);
+
+      const payCreditButton = event.target.closest("[data-pay-credit]");
+      if (payCreditButton) openPaymentModal(payCreditButton.dataset.payCredit);
+
+      const faultyProductButton = event.target.closest("[data-faulty-product]");
+      if (faultyProductButton) openFaultyModal(faultyProductButton.dataset.faultyProduct);
+
+      const action = event.target.closest("[data-action]")?.dataset.action;
+      if (action === "clearCart") { state.cart = []; renderCart(); }
+      if (action === "checkout") checkout();
+      if (action === "addProduct") addProductQuick();
+      if (action === "receiveStock") receiveStockQuick();
+      if (action === "receiveBarcode") handleBarcode($("#receiveBarcode").value, "receive", "manual");
+      if (action === "saleBarcode") handleBarcode($("#saleBarcode").value, "sale", "manual");
+      if (action === "applyReportRange") {
+        state.reportMode = $("#reportMode").value;
+        state.reportStart = $("#reportStart").value;
+        state.reportEnd = $("#reportEnd").value;
+        renderReports();
+      }
+      if (action === "recordPayment") openPaymentModal();
+      if (action === "openFaultyReturn") openFaultyModal();
+      if (action === "stopCamera") stopCameraScan();
+      if (action === "closeProductModal") closeProductModal();
+      if (action === "closePaymentModal") closePaymentModal();
+      if (action === "closeFaultyModal") closeFaultyModal();
+      if (action === "signOut") signOut();
+
+      const camera = event.target.closest("[data-camera-mode]");
+      if (camera) startCameraScan(camera.dataset.cameraMode);
+    });
+
+    $("#menuBtn").addEventListener("click", () => document.body.classList.toggle("nav-open"));
+    $("#authForm").addEventListener("submit", handleAuthSubmit);
+    $("#globalSearch").addEventListener("input", event => { state.search = event.target.value; renderAll(); });
+    $("#categoryFilter").addEventListener("change", event => { state.categoryFilter = event.target.value; renderAll(); });
+    $("#productSort").addEventListener("change", event => { state.productSort = event.target.value; renderAll(); });
+    $("#saleDiscount").addEventListener("input", renderCart);
+    $("#saleBarcode").addEventListener("keydown", event => { if (event.key === "Enter") handleBarcode(event.currentTarget.value, "sale", "manual"); });
+    $("#receiveBarcode").addEventListener("keydown", event => { if (event.key === "Enter") handleBarcode(event.currentTarget.value, "receive", "manual"); });
+    document.addEventListener("keydown", handleUsbScannerKey);
+    $("#paymentCredit").addEventListener("change", event => {
+      const credit = byId(openCredits(), event.target.value);
+      $("#paymentAmount").value = credit.balance || "";
+    });
+    $("#customerForm").addEventListener("submit", event => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      state.data.customers.unshift({
+        id: crypto.randomUUID(),
+        name: form.get("name"),
+        phone: form.get("phone"),
+        address: form.get("address"),
+        credit_limit: Number(form.get("credit_limit") || 0),
+        status: form.get("status"),
+        lifetime_value: 0
+      });
+      renderAll();
+      toast("Customer saved to this session.");
+    });
+    $("#paymentForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      const credit = byId(state.data.credits, form.get("credit_id"));
+      if (!credit.id) return toast("Choose a valid credit.");
+      const amount = Math.max(0, Number(form.get("amount") || 0));
+      if (!amount) return toast("Enter a payment amount.");
+      if (amount > Number(credit.balance)) return toast("Payment cannot be greater than the balance.");
+      const payment = { id: crypto.randomUUID(), credit_id: credit.id, amount, payment_type: form.get("payment_type"), created_at: todayIso() };
+      const newBalance = Number(credit.balance) - amount;
+      const update = { balance: newBalance, status: newBalance <= 0 ? "paid" : "open" };
+      const activity = { id: crypto.randomUUID(), actor: state.profile?.full_name || "Cloud11 Admin", action: `Recorded ${money(amount)} credit payment`, entity_type: "credits", entity_id: credit.id, created_at: todayIso() };
+      try {
+        if (state.online) {
+          await db.insert("credit_payments", payment);
+          await db.update("credits", credit.id, update);
+          await db.insert("activity_logs", activity);
+        }
+      } catch (error) {
+        console.warn(error);
+        toast("Supabase payment save failed.");
         return;
       }
-      pending.forEach(p => p.synced = true);
-      recordAudit('sync.payments', `${pending.length} ${t('receipts')}`);
-      persist();
-      if (forceToast) toast(t('synced'));
-    }
-    function updateSyncCount() {
-      document.getElementById('syncCount').textContent = visiblePayments().filter(p => !p.synced).length;
-    }
-    function updateNet() {
-      document.getElementById('netDot').classList.toggle('off', !navigator.onLine);
-      document.getElementById('netText').textContent = navigator.onLine ? t('connected') : t('offline');
-      if (navigator.onLine) syncSupabase();
+      credit.balance = newBalance;
+      credit.status = update.status;
+      state.data.credit_payments.unshift(payment);
+      state.data.activity_logs.unshift(activity);
+      closePaymentModal();
+      renderAll();
+      toast(`Recorded ${money(amount)} credit payment.`);
+    });
+    $("#faultyForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      const product = byId(state.data.products, form.get("product_id"));
+      if (!product.id) return toast("Choose a valid product.");
+      const qty = Math.max(1, Number(form.get("quantity") || 1));
+      const cost = Number(form.get("cost") || 0);
+      const outcome = form.get("outcome");
+      const notes = String(form.get("notes") || "").replace(/\s+/g, " ").trim();
+      const movement = {
+        id: crypto.randomUUID(),
+        product_id: product.id,
+        barcode: form.get("barcode") || product.barcode || null,
+        change_qty: -qty,
+        reason: `Faulty return | outcome: ${outcome} | cost: ${cost} | notes: ${notes}`,
+        source_type: "faulty_return",
+        source_id: form.get("customer_id") || null,
+        created_at: todayIso()
+      };
+      const activity = { id: crypto.randomUUID(), actor: state.profile?.full_name || "Cloud11 Admin", action: `Reported ${qty} faulty ${product.name}`, entity_type: "inventory_history", entity_id: movement.id, created_at: todayIso() };
+      try {
+        if (state.online) {
+          await db.insert("inventory_history", movement);
+          await db.insert("activity_logs", activity);
+        }
+      } catch (error) {
+        console.warn(error);
+        toast("Supabase faulty return save failed.");
+        return;
+      }
+      state.data.inventory_history.unshift(movement);
+      state.data.activity_logs.unshift(activity);
+      closeFaultyModal();
+      renderAll();
+      toast("Faulty product return recorded.");
+    });
+    $("#productForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      const barcode = String(form.get("barcode")).trim();
+      if (findProductByBarcode(barcode)) return toast("That barcode already belongs to a product.");
+      const product = {
+        id: crypto.randomUUID(),
+        barcode,
+        sku: String(form.get("sku")).trim(),
+        name: String(form.get("name")).trim(),
+        category_id: form.get("category_id") || null,
+        supplier_id: form.get("supplier_id") || null,
+        brand: form.get("brand"),
+        flavor: form.get("flavor"),
+        variant: form.get("flavor"),
+        unit_cost: Number(form.get("unit_cost") || 0),
+        retail_price: Number(form.get("retail_price") || 0),
+        stock_qty: Number(form.get("stock_qty") || 0),
+        reorder_level: Number(form.get("reorder_level") || 0),
+        status: "active",
+        icon: "P",
+        image_url: "cloud11-scanned-product",
+        description: form.get("description")
+      };
+      const variant = { id: crypto.randomUUID(), product_id: product.id, barcode, name: product.variant, flavor: product.flavor, attributes: { source: "barcode_scan" }, stock_qty: product.stock_qty, retail_price: product.retail_price };
+      try {
+        if (state.online) {
+          await db.insert("products", product);
+          await db.insert("product_variants", variant);
+        }
+      } catch (error) {
+        console.warn(error);
+        toast("Supabase product insert failed; showing local session product.");
+      }
+      state.data.products.unshift(product);
+      state.data.product_variants.unshift(variant);
+      state.data.activity_logs.unshift({ id: crypto.randomUUID(), actor: "Cloud11 Admin", action: `Created product from barcode ${barcode}`, entity_type: "products", entity_id: product.id, created_at: todayIso() });
+      logScan({ barcode, product, context: "product_created", sourceType: "products", sourceId: product.id, quantity: 1, deviceType: "manual" });
+      closeProductModal();
+      renderAll();
+      toast("Scanned product saved.");
+    });
+
+    supabaseClient.auth.onAuthStateChange((_event, session) => {
+      if (session?.access_token !== state.session?.access_token) activateSession(session).catch(error => {
+        console.warn(error);
+        setAuthMessage("Could not restore the Cloud11 session. Log in again after setup is complete.", true);
+      });
+    });
+
+    async function init() {
+      $("#supabaseUrl").value = SUPABASE_URL;
+      $("#supabaseKey").value = SUPABASE_ANON_KEY;
+      const { data, error } = await supabaseClient.auth.getSession();
+      if (error) setAuthMessage(error.message, true);
+      if (data?.session) await activateSession(data.session);
     }
 
-    function renderView() {
-      document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
-      document.getElementById('supabaseBtn').innerHTML = icon('settings') + t('configure');
-      document.getElementById('newPaymentTop').innerHTML = icon('plus') + t('newPayment');
-      document.getElementById('closeModal').innerHTML = icon('close');
-      if (state.view === 'dashboard') renderDashboard();
-      if (state.view === 'payments') renderPayments();
-      if (state.view === 'receipts') renderReceipts();
-      if (state.view === 'crew') renderCrew();
-      if (state.view === 'catalogs') renderCatalogs();
-      if (state.view === 'reports') renderReports();
-      if (state.view === 'settings') renderSettings();
-      updateNet();
-      updateSyncCount();
-    }
-
-    document.addEventListener('click', event => {
-      const goButton = event.target.closest('[data-go]');
-      if (goButton) go(goButton.dataset.go);
-    });
-    document.getElementById('langBtn').addEventListener('click', () => {
-      state.lang = state.lang === 'es' ? 'en' : 'es';
-      localStorage.setItem('cc_lang', state.lang);
-      go(state.view);
-    });
-    document.getElementById('supabaseBtn').addEventListener('click', () => go('settings'));
-    document.getElementById('closeModal').addEventListener('click', closeModal);
-    document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
-    document.getElementById('gateLoginForm').addEventListener('submit', async e => {
-      e.preventDefault();
-      setLoginMessage('');
-      const data = Object.fromEntries(new FormData(e.target));
-      await signInSupabase(data.email, data.password);
-    });
-    window.addEventListener('online', updateNet);
-    window.addEventListener('offline', updateNet);
-
-    setupSupabase();
-    updateAuthGate();
-    hydrateSession();
-    renderNav();
-    go('dashboard');
+    init();
   </script>
 </body>
 </html>
+
