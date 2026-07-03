@@ -1,0 +1,26 @@
+{
+  "name": "Cloud11 Store Management",
+  "short_name": "Cloud11",
+  "description": "Cloud11 internal vape store management system.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#04050d",
+  "theme_color": "#04050d",
+  "icons": [
+    {
+      "src": "./favicon-32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "./apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "./cloud11-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
