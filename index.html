@@ -8,7 +8,6 @@
   <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
   <link rel="manifest" href="./site.webmanifest">
   <meta name="theme-color" content="#04050d">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
       color-scheme: dark;
@@ -659,6 +658,13 @@
       font-size: 48px;
     }
 
+    .product-art img {
+      width: 100%;
+      height: 128px;
+      object-fit: cover;
+      display: block;
+    }
+
     .product-body { padding: 14px; }
     .product h3 { margin: 0; font-size: 16px; }
     .product p { min-height: 40px; margin: 8px 0 12px; color: var(--muted); font-size: 13px; }
@@ -783,6 +789,44 @@
       background: linear-gradient(90deg, transparent, var(--blue), var(--pink), transparent);
       box-shadow: 0 0 18px var(--blue);
       animation: scanline 1.6s ease-in-out infinite;
+    }
+
+    .scanner-status {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      color: var(--muted);
+      text-align: center;
+      background: radial-gradient(circle at center, rgba(25,214,255,.14), rgba(0,0,0,.72));
+    }
+
+    .scanner-frame.ready .scanner-status { display: none; }
+
+    .scanner-manual {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .image-preview {
+      display: none;
+      min-height: 150px;
+      overflow: hidden;
+      border: 1px solid rgba(25,214,255,.22);
+      border-radius: 16px;
+      background: rgba(255,255,255,.05);
+    }
+
+    .image-preview.show { display: block; }
+
+    .image-preview img {
+      width: 100%;
+      height: 220px;
+      object-fit: cover;
+      display: block;
     }
 
     @keyframes scanline {
@@ -1158,7 +1202,12 @@
       <div class="scanner-frame">
         <video id="scannerVideo" playsinline muted></video>
         <div class="scanner-line"></div>
+        <div class="scanner-status" id="scannerStatus">Camera is waiting to start.</div>
       </div>
+      <form class="scanner-manual" id="scannerManualForm">
+        <input id="scannerManualInput" inputmode="numeric" autocomplete="off" placeholder="Enter barcode manually">
+        <button class="btn primary" type="submit">Use Barcode</button>
+      </form>
       <p class="sub">USB scanners are supported automatically on desktop because they type the barcode and press Enter.</p>
     </div>
   </div>
@@ -1166,7 +1215,7 @@
   <div class="modal" id="productModal" aria-hidden="true">
     <div class="card pad modal-card">
       <div class="panel-head">
-        <div><h3 id="productModalTitle">New Product From Barcode</h3><p class="sub">Unknown barcode detected. Save the product once, then future scans will open it instantly.</p></div>
+        <div><h3 id="productModalTitle">New Product From Barcode</h3><p class="sub" id="productModalSubtitle">Unknown barcode detected. Save the product once, then future scans will open it instantly.</p></div>
         <button class="btn danger" data-action="closeProductModal">Close</button>
       </div>
       <form class="form-grid" id="productForm">
@@ -1181,8 +1230,10 @@
         <div class="field"><label>Retail</label><input name="retail_price" type="number" min="0" value="450"></div>
         <div class="field"><label>Opening Stock</label><input name="stock_qty" type="number" min="0" value="0"></div>
         <div class="field"><label>Reorder Level</label><input name="reorder_level" type="number" min="0" value="6"></div>
+        <div class="field full"><label>Product Image</label><input name="product_image" id="productImageInput" type="file" accept="image/*"></div>
+        <div class="field full"><div class="image-preview" id="productImagePreview"><img id="productImagePreviewImg" alt="Product image preview"></div></div>
         <div class="field full"><label>Description</label><textarea name="description">Created automatically from a scanned barcode.</textarea></div>
-        <div class="field full"><button class="btn primary" type="submit">Save Product</button></div>
+        <div class="field full"><button class="btn primary" id="productSubmitLabel" type="submit">Save Product</button></div>
       </form>
     </div>
   </div>
@@ -1221,6 +1272,8 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
   <script>
     const SUPABASE_URL = "https://dhlhzpocrukpbvvppwxj.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_XnUWgPm2x9ShI3TOkzTY7w_-Qw9dc1o";
@@ -1259,6 +1312,7 @@
       session: null,
       user: null,
       profile: null,
+      editingProductId: null,
       online: false,
       realtimeChannel: null
     };
@@ -1303,6 +1357,7 @@
         if (state.realtimeChannel) supabaseClient.removeChannel(state.realtimeChannel);
         state.realtimeChannel = supabaseClient.channel("cloud11-live")
           .on("postgres_changes", { event: "*", schema: "public", table: "products" }, refreshData)
+          .on("postgres_changes", { event: "*", schema: "public", table: "product_images" }, refreshData)
           .on("postgres_changes", { event: "*", schema: "public", table: "product_variants" }, refreshData)
           .on("postgres_changes", { event: "*", schema: "public", table: "sales" }, refreshData)
           .on("postgres_changes", { event: "*", schema: "public", table: "credits" }, refreshData)
@@ -1560,15 +1615,19 @@
       $("#productGrid").innerHTML = products.map(product => {
         const cat = byId(state.data.categories, product.category_id).name || "Uncategorized";
         const stockClass = product.stock_qty <= product.reorder_level ? "red" : "green";
+        const productImage = product.image_url || state.data.product_images.find(image => image.product_id === product.id)?.url;
+        const art = productImage && (productImage.startsWith("data:") || productImage.startsWith("http"))
+          ? `<img src="${productImage}" alt="${product.name}">`
+          : (product.icon || "P");
         return `
           <article class="card product">
-            <div class="product-art">${product.icon || "P"}</div>
+            <div class="product-art">${art}</div>
             <div class="product-body">
               <div class="product-row"><span class="badge blue">${cat}</span><span class="badge ${stockClass}">${product.stock_qty} in stock</span></div>
               <h3 style="margin-top:12px">${product.name}</h3>
               <p>${product.description || "Cloud11 catalog product."}<br><span class="badge pink">${product.barcode || "No barcode"}</span></p>
               <div class="product-row"><span class="price">${money(product.retail_price)}</span><button class="btn" data-add-cart="${product.id}">Add</button></div>
-              <button class="btn danger" style="width:100%; margin-top:10px" data-faulty-product="${product.id}">Report Faulty</button>
+              <div class="product-row" style="margin-top:10px"><button class="btn" data-edit-product="${product.id}">Edit</button><button class="btn danger" data-faulty-product="${product.id}">Report Faulty</button></div>
             </div>
           </article>
         `;
@@ -1774,17 +1833,109 @@
     }
 
     function openProductFormWithBarcode(barcode) {
+      state.editingProductId = null;
+      const form = $("#productForm");
+      form.reset();
+      $("#productModalTitle").textContent = "New Product From Barcode";
+      $("#productModalSubtitle").textContent = "Unknown barcode detected. Save the product once, then future scans will open it instantly.";
+      $("#productSubmitLabel").textContent = "Save Product";
       $("#productBarcode").value = barcode;
       $("#productSku").value = `C11-SCAN-${String(barcode).slice(-6) || Math.floor(Math.random() * 900000)}`;
+      form.elements["name"].value = "New Scanned Vape Product";
+      form.elements["brand"].value = "Cloud11";
+      form.elements["flavor"].value = "New Flavor";
+      form.elements["unit_cost"].value = 250;
+      form.elements["retail_price"].value = 450;
+      form.elements["stock_qty"].value = 0;
+      form.elements["reorder_level"].value = 6;
+      form.elements["description"].value = "Created automatically from a scanned barcode.";
+      $("#productImageInput").value = "";
+      $("#productImagePreview").classList.remove("show");
+      $("#productImagePreviewImg").removeAttribute("src");
       $("#productModal").classList.add("show");
       $("#productModal").setAttribute("aria-hidden", "false");
       $("#productBarcode").focus();
       toast("Unknown barcode. Product form is ready.");
     }
 
+    function openProductEditor(productId) {
+      const product = byId(state.data.products, productId);
+      if (!product.id) return toast("Product was not found.");
+      state.editingProductId = product.id;
+      const form = $("#productForm");
+      const productImage = product.image_url || state.data.product_images.find(image => image.product_id === product.id)?.url || "";
+      $("#productModalTitle").textContent = "Edit Product";
+      $("#productModalSubtitle").textContent = "Update price, stock, barcode, supplier, details, or product image.";
+      $("#productSubmitLabel").textContent = "Update Product";
+      form.elements["barcode"].value = product.barcode || "";
+      form.elements["sku"].value = product.sku || "";
+      form.elements["name"].value = product.name || "";
+      form.elements["category_id"].value = product.category_id || "";
+      form.elements["supplier_id"].value = product.supplier_id || "";
+      form.elements["brand"].value = product.brand || "";
+      form.elements["flavor"].value = product.flavor || product.variant || "";
+      form.elements["unit_cost"].value = product.unit_cost ?? 0;
+      form.elements["retail_price"].value = product.retail_price ?? 0;
+      form.elements["stock_qty"].value = product.stock_qty ?? 0;
+      form.elements["reorder_level"].value = product.reorder_level ?? 0;
+      form.elements["description"].value = product.description || "";
+      $("#productImageInput").value = "";
+      if (productImage && (productImage.startsWith("data:") || productImage.startsWith("http"))) {
+        $("#productImagePreviewImg").src = productImage;
+        $("#productImagePreview").classList.add("show");
+      } else {
+        $("#productImagePreview").classList.remove("show");
+        $("#productImagePreviewImg").removeAttribute("src");
+      }
+      $("#productModal").classList.add("show");
+      $("#productModal").setAttribute("aria-hidden", "false");
+      form.elements["name"].focus();
+    }
+
     function closeProductModal() {
       $("#productModal").classList.remove("show");
       $("#productModal").setAttribute("aria-hidden", "true");
+      state.editingProductId = null;
+    }
+
+    function compressImageFile(file, maxSize = 720, quality = 0.82) {
+      return new Promise((resolve, reject) => {
+        if (!file) return resolve("");
+        const reader = new FileReader();
+        reader.onerror = reject;
+        reader.onload = () => {
+          const img = new Image();
+          img.onerror = reject;
+          img.onload = () => {
+            const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round(img.width * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL("image/jpeg", quality));
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function setScannerStatus(message) {
+      $("#scannerStatus").textContent = message;
+      $("#scannerStatus").style.display = message ? "grid" : "none";
+    }
+
+    function stopCameraStreamOnly() {
+      scannerActive = false;
+      if (zxingReader) {
+        zxingReader.reset();
+        zxingReader = null;
+      }
+      if (scannerStream) scannerStream.getTracks().forEach(track => track.stop());
+      scannerStream = null;
+      $("#scannerVideo").srcObject = null;
+      $(".scanner-frame").classList.remove("ready");
     }
 
     function handleBarcode(barcode, mode, deviceType = "keyboard") {
@@ -1835,6 +1986,7 @@
     }
 
     let scannerStream = null;
+    let zxingReader = null;
     let scannerMode = "sale";
     let scannerActive = false;
 
@@ -1843,15 +1995,51 @@
       $("#scannerModal").classList.add("show");
       $("#scannerModal").setAttribute("aria-hidden", "false");
       $("#scannerHelp").textContent = mode === "receive" ? "Scan the box barcode, then stock receiving will use the quantity entered." : "Scan a product barcode to add it to the POS cart.";
-      if (!("BarcodeDetector" in window)) {
-        toast("Camera barcode detection is not available in this browser yet. Use the manual field or a USB scanner.");
+      $("#scannerManualInput").value = "";
+      setScannerStatus("Requesting camera access...");
+      if (!window.isSecureContext && location.protocol !== "https:" && location.hostname !== "localhost") {
+        setScannerStatus("Camera access needs the hosted HTTPS site. Use the manual barcode field here, or open the GitHub Pages link on your iPhone.");
+        toast("Camera needs HTTPS. Test camera scanning on the hosted site.");
+        return;
+      }
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setScannerStatus("This browser does not expose camera access. Use the manual barcode field or a USB scanner.");
+        toast("Camera access is not available in this browser.");
         return;
       }
       try {
-        scannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+        stopCameraStreamOnly();
         const video = $("#scannerVideo");
+        if (!("BarcodeDetector" in window) && window.ZXing?.BrowserMultiFormatReader) {
+          scannerActive = true;
+          zxingReader = new ZXing.BrowserMultiFormatReader();
+          const decoding = zxingReader.decodeFromVideoDevice(null, video, result => {
+            if (!scannerActive || !result) return;
+            const raw = result.text || result.getText?.();
+            if (!raw) return;
+            stopCameraScan();
+            handleBarcode(raw, scannerMode, "camera");
+          });
+          Promise.resolve(decoding).catch(error => {
+            console.warn(error);
+            stopCameraStreamOnly();
+            setScannerStatus("Camera barcode scanning failed. Use the manual barcode field below.");
+          });
+          $(".scanner-frame").classList.add("ready");
+          setScannerStatus("");
+          toast("Camera scanner started.");
+          return;
+        }
+        scannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
         video.srcObject = scannerStream;
         await video.play();
+        $(".scanner-frame").classList.add("ready");
+        setScannerStatus("");
+        if (!("BarcodeDetector" in window)) {
+          setScannerStatus("Camera is open, but this browser cannot read barcodes automatically. Type the barcode below after viewing it, or use Safari/Chrome on the hosted HTTPS site.");
+          toast("Camera opened, but barcode detection is not supported here.");
+          return;
+        }
         scannerActive = true;
         const detector = new BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "qr_code"] });
         const tick = async () => {
@@ -1871,15 +2059,17 @@
         tick();
       } catch (error) {
         console.warn(error);
-        toast("Camera permission was not available. Manual and USB scanning still work.");
+        stopCameraStreamOnly();
+        const message = error?.name === "NotAllowedError"
+          ? "Camera permission was denied. Allow camera access in the browser, or use the manual barcode field."
+          : "Camera permission was not available. Manual and USB scanning still work.";
+        setScannerStatus(message);
+        toast(message);
       }
     }
 
     function stopCameraScan() {
-      scannerActive = false;
-      if (scannerStream) scannerStream.getTracks().forEach(track => track.stop());
-      scannerStream = null;
-      $("#scannerVideo").srcObject = null;
+      stopCameraStreamOnly();
       $("#scannerModal").classList.remove("show");
       $("#scannerModal").setAttribute("aria-hidden", "true");
     }
@@ -2133,6 +2323,9 @@
       const add = event.target.closest("[data-add-cart]");
       if (add) addToCart(add.dataset.addCart);
 
+      const editProductButton = event.target.closest("[data-edit-product]");
+      if (editProductButton) openProductEditor(editProductButton.dataset.editProduct);
+
       const remove = event.target.closest("[data-remove-cart]");
       if (remove) removeFromCart(remove.dataset.removeCart);
 
@@ -2181,6 +2374,13 @@
     $("#saleDiscount").addEventListener("input", renderCart);
     $("#saleBarcode").addEventListener("keydown", event => { if (event.key === "Enter") handleBarcode(event.currentTarget.value, "sale", "manual"); });
     $("#receiveBarcode").addEventListener("keydown", event => { if (event.key === "Enter") handleBarcode(event.currentTarget.value, "receive", "manual"); });
+    $("#scannerManualForm").addEventListener("submit", event => {
+      event.preventDefault();
+      const barcode = $("#scannerManualInput").value.trim();
+      if (!barcode) return toast("Enter a barcode first.");
+      stopCameraScan();
+      handleBarcode(barcode, scannerMode, "manual");
+    });
     document.addEventListener("keydown", handleUsbScannerKey);
     $("#paymentCredit").addEventListener("change", event => {
       const credit = byId(openCredits(), event.target.value);
@@ -2268,13 +2468,35 @@
       renderAll();
       toast("Faulty product return recorded.");
     });
+    $("#productImageInput").addEventListener("change", async event => {
+      const file = event.target.files?.[0];
+      if (!file) {
+        $("#productImagePreview").classList.remove("show");
+        $("#productImagePreviewImg").removeAttribute("src");
+        return;
+      }
+      try {
+        const imageUrl = await compressImageFile(file, 720, 0.82);
+        $("#productImagePreviewImg").src = imageUrl;
+        $("#productImagePreview").classList.add("show");
+      } catch (error) {
+        console.warn(error);
+        toast("Could not preview that image.");
+      }
+    });
     $("#productForm").addEventListener("submit", async event => {
       event.preventDefault();
       const form = new FormData(event.currentTarget);
       const barcode = String(form.get("barcode")).trim();
-      if (findProductByBarcode(barcode)) return toast("That barcode already belongs to a product.");
+      const editingId = state.editingProductId;
+      const existingProduct = editingId ? byId(state.data.products, editingId) : null;
+      const duplicateProduct = state.data.products.find(product => product.barcode === barcode && product.id !== editingId);
+      if (duplicateProduct) return toast("That barcode already belongs to another product.");
+      const imageFile = $("#productImageInput").files?.[0];
+      const imageUrl = imageFile ? await compressImageFile(imageFile, 720, 0.82) : "";
       const product = {
-        id: crypto.randomUUID(),
+        ...(existingProduct?.id ? existingProduct : {}),
+        id: editingId || crypto.randomUUID(),
         barcode,
         sku: String(form.get("sku")).trim(),
         name: String(form.get("name")).trim(),
@@ -2289,26 +2511,54 @@
         reorder_level: Number(form.get("reorder_level") || 0),
         status: "active",
         icon: "P",
-        image_url: "cloud11-scanned-product",
+        image_url: imageUrl || existingProduct?.image_url || null,
         description: form.get("description")
       };
-      const variant = { id: crypto.randomUUID(), product_id: product.id, barcode, name: product.variant, flavor: product.flavor, attributes: { source: "barcode_scan" }, stock_qty: product.stock_qty, retail_price: product.retail_price };
+      const existingVariant = state.data.product_variants.find(variant => variant.product_id === product.id);
+      const variant = { id: existingVariant?.id || crypto.randomUUID(), product_id: product.id, barcode, name: product.variant, flavor: product.flavor, attributes: existingVariant?.attributes || { source: editingId ? "product_edit" : "barcode_scan" }, stock_qty: product.stock_qty, retail_price: product.retail_price };
+      const existingImage = state.data.product_images.find(image => image.product_id === product.id);
+      const productImage = imageUrl ? { id: crypto.randomUUID(), product_id: product.id, url: imageUrl, alt_text: product.name, sort_order: 0 } : null;
+      const activity = { id: crypto.randomUUID(), actor: state.profile?.full_name || "Cloud11 Admin", action: editingId ? `Edited product ${product.name}` : `Created product from barcode ${barcode}`, entity_type: "products", entity_id: product.id, created_at: todayIso() };
       try {
         if (state.online) {
-          await db.insert("products", product);
-          await db.insert("product_variants", variant);
+          const saveProduct = async payload => {
+            if (editingId) return db.update("products", product.id, payload);
+            return db.insert("products", payload);
+          };
+          try {
+            await saveProduct(product);
+          } catch (error) {
+            if (!String(error.message || "").includes("image_url")) throw error;
+            const fallbackProduct = { ...product };
+            delete fallbackProduct.image_url;
+            await saveProduct(fallbackProduct);
+          }
+          if (existingVariant) await db.update("product_variants", variant.id, variant);
+          else await db.insert("product_variants", variant);
+          if (productImage) {
+            const imageSave = existingImage ? db.update("product_images", existingImage.id, { url: imageUrl, alt_text: product.name, sort_order: 0 }) : db.insert("product_images", productImage);
+            await imageSave.catch(error => {
+              console.warn("product image insert failed", error);
+              toast("Product saved, but the image could not be stored.");
+            });
+          }
+          await db.insert("activity_logs", activity).catch(error => console.warn("activity log insert failed", error));
         }
       } catch (error) {
         console.warn(error);
-        toast("Supabase product insert failed; showing local session product.");
+        toast("Supabase product save failed; showing local session product.");
       }
-      state.data.products.unshift(product);
-      state.data.product_variants.unshift(variant);
-      state.data.activity_logs.unshift({ id: crypto.randomUUID(), actor: "Cloud11 Admin", action: `Created product from barcode ${barcode}`, entity_type: "products", entity_id: product.id, created_at: todayIso() });
-      logScan({ barcode, product, context: "product_created", sourceType: "products", sourceId: product.id, quantity: 1, deviceType: "manual" });
+      if (editingId) state.data.products = state.data.products.map(item => item.id === product.id ? product : item);
+      else state.data.products.unshift(product);
+      if (existingVariant) state.data.product_variants = state.data.product_variants.map(item => item.id === variant.id ? variant : item);
+      else state.data.product_variants.unshift(variant);
+      if (productImage && existingImage) state.data.product_images = state.data.product_images.map(item => item.id === existingImage.id ? { ...existingImage, url: imageUrl, alt_text: product.name, sort_order: 0 } : item);
+      if (productImage && !existingImage) state.data.product_images.unshift(productImage);
+      state.data.activity_logs.unshift(activity);
+      if (!editingId) logScan({ barcode, product, context: "product_created", sourceType: "products", sourceId: product.id, quantity: 1, deviceType: "manual" });
       closeProductModal();
       renderAll();
-      toast("Scanned product saved.");
+      toast(editingId ? "Product updated." : "Scanned product saved.");
     });
 
     supabaseClient.auth.onAuthStateChange((_event, session) => {
