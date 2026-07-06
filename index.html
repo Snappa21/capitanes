@@ -710,6 +710,13 @@
       border-bottom: 1px solid rgba(255,255,255,.08);
     }
 
+    .customer-pick {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: end;
+    }
+
     .cart-total {
       display: grid;
       gap: 8px;
@@ -927,7 +934,7 @@
       .topbar .user-chip { display: none; }
       .page-head { display: grid; }
       .actions { justify-content: flex-start; }
-      .grid.kpi, .grid.three, .product-grid, .pos-products, .form-grid { grid-template-columns: 1fr; }
+      .grid.kpi, .grid.three, .product-grid, .pos-products, .form-grid, .customer-pick { grid-template-columns: 1fr; }
       .scan-panel, .scan-panel .form-grid { grid-template-columns: 1fr; }
       .hero { min-height: 280px; }
       .hero h3 { font-size: 42px; }
@@ -1085,7 +1092,7 @@
           <div class="card pad">
             <div class="panel-head"><h3>Cart</h3><button class="btn danger" data-action="clearCart">Clear</button></div>
             <div class="form-grid">
-              <div class="field full"><label>Customer</label><select id="saleCustomer"></select></div>
+              <div class="field full"><label>Customer</label><div class="customer-pick"><select id="saleCustomer"></select><button class="btn" type="button" data-action="openQuickCustomer">New</button></div></div>
               <div class="field"><label>Payment</label><select id="paymentType"><option>cash</option><option>card</option><option>transfer</option><option>credit</option></select></div>
               <div class="field"><label>Discount</label><input id="saleDiscount" type="number" value="0" min="0" step="1"></div>
             </div>
@@ -1268,6 +1275,23 @@
         <div class="field"><label>Barcode</label><input name="barcode" id="faultyBarcode" autocomplete="off"></div>
         <div class="field full"><label>Notes</label><textarea name="notes">Customer reported faulty vape.</textarea></div>
         <div class="field full"><button class="btn primary" type="submit">Save Faulty Return</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="quickCustomerModal" aria-hidden="true">
+    <div class="card pad modal-card">
+      <div class="panel-head">
+        <div><h3>Add Customer</h3><p class="sub">Create the customer and attach them to the current checkout.</p></div>
+        <button class="btn danger" data-action="closeQuickCustomer">Close</button>
+      </div>
+      <form class="form-grid" id="quickCustomerForm">
+        <div class="field"><label>Name</label><input name="name" required></div>
+        <div class="field"><label>Phone</label><input name="phone" placeholder="+504 0000-0000"></div>
+        <div class="field full"><label>Delivery Address</label><input name="address" placeholder="Guanaja, Bay Islands"></div>
+        <div class="field"><label>Credit Limit</label><input name="credit_limit" type="number" min="0" value="0"></div>
+        <div class="field"><label>Status</label><select name="status"><option>active</option><option>paused</option></select></div>
+        <div class="field full"><button class="btn primary" type="submit">Save Customer</button></div>
       </form>
     </div>
   </div>
@@ -1740,7 +1764,7 @@
     }
 
     function renderPos() {
-      $("#saleCustomer").innerHTML = state.data.customers.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+      $("#saleCustomer").innerHTML = `<option value="">Walk-in Customer</option>` + state.data.customers.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
       $("#posProductCount").textContent = `${state.data.products.length} products`;
       $("#posProducts").innerHTML = filterRows(state.data.products, ["name", "sku", "brand"]).map(p => `
         <button class="card pos-item" data-add-cart="${p.id}">
@@ -1781,7 +1805,7 @@
       const total = Math.max(0, subtotal - discount);
       $("#cartLines").innerHTML = state.cart.length ? state.cart.map(line => `
         <div class="cart-line">
-          <div><strong>${line.product.name}</strong><br><span class="sub">${line.quantity} Ã— ${money(line.product.retail_price)}</span></div>
+          <div><strong>${line.product.name}</strong><br><span class="sub">${line.quantity} x ${money(line.product.retail_price)}</span></div>
           <div><strong>${money(line.quantity * line.product.retail_price)}</strong><br><button class="btn" data-remove-cart="${line.product.id}">Remove</button></div>
         </div>
       `).join("") : `<p class="sub">Cart is empty.</p>`;
@@ -2099,8 +2123,9 @@
 
     async function checkout() {
       if (!state.cart.length) return toast("Add products before checkout.");
-      const customerId = $("#saleCustomer").value;
+      const customerId = $("#saleCustomer").value || null;
       const paymentType = $("#paymentType").value;
+      if (paymentType === "credit" && !customerId) return toast("Choose or add a customer before creating credit.");
       const discount = Number($("#saleDiscount").value || 0);
       const subtotal = state.cart.reduce((sum, line) => sum + line.quantity * line.product.retail_price, 0);
       const total = Math.max(0, subtotal - discount);
@@ -2108,6 +2133,10 @@
       const items = state.cart.map(line => ({ id: crypto.randomUUID(), sale_id: sale.id, product_id: line.product.id, quantity: line.quantity, unit_price: line.product.retail_price, line_total: line.quantity * line.product.retail_price }));
       const movements = state.cart.map(line => ({ id: crypto.randomUUID(), product_id: line.product.id, barcode: line.product.barcode || null, change_qty: -line.quantity, reason: "Sale", source_type: "sale", source_id: sale.id, created_at: todayIso() }));
       const saleScans = state.cart.map(line => ({ id: crypto.randomUUID(), barcode: line.product.barcode || line.product.sku, product_id: line.product.id, scan_context: "sale_checkout", source_type: "sale", source_id: sale.id, quantity: line.quantity, device_type: "checkout", created_at: todayIso() }));
+      const stockUpdates = state.cart.map(line => {
+        const product = byId(state.data.products, line.product.id);
+        return { product, stock_qty: Math.max(0, Number(product.stock_qty || 0) - line.quantity) };
+      });
 
       try {
         if (state.online) {
@@ -2115,6 +2144,7 @@
           await db.insert("sale_items", items);
           await db.insert("inventory_history", movements);
           await db.insert("scan_history", saleScans);
+          for (const update of stockUpdates) await db.update("products", update.product.id, { stock_qty: update.stock_qty });
           if (paymentType === "credit") {
             await db.insert("credits", { id: crypto.randomUUID(), customer_id: customerId, sale_id: sale.id, original_amount: total, balance: total, due_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), status: "open" });
           }
@@ -2129,10 +2159,7 @@
       state.data.inventory_history.unshift(...movements);
       state.data.scan_history.unshift(...saleScans);
       if (paymentType === "credit") state.data.credits.unshift({ id: crypto.randomUUID(), customer_id: customerId, sale_id: sale.id, original_amount: total, balance: total, due_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), status: "open" });
-      state.cart.forEach(line => {
-        const product = byId(state.data.products, line.product.id);
-        product.stock_qty = Math.max(0, Number(product.stock_qty) - line.quantity);
-      });
+      stockUpdates.forEach(update => { update.product.stock_qty = update.stock_qty; });
       state.data.activity_logs.unshift({ id: crypto.randomUUID(), actor: "Cloud11 Admin", action: `Completed ${paymentType} sale for ${money(total)}`, entity_type: "sales", entity_id: sale.id, created_at: todayIso() });
       state.cart = [];
       renderAll();
@@ -2313,6 +2340,43 @@
       $("#faultyModal").setAttribute("aria-hidden", "true");
     }
 
+    function openQuickCustomerModal() {
+      $("#quickCustomerForm").reset();
+      $("#quickCustomerModal").classList.add("show");
+      $("#quickCustomerModal").setAttribute("aria-hidden", "false");
+      $("#quickCustomerForm").elements["name"].focus();
+    }
+
+    function closeQuickCustomerModal() {
+      $("#quickCustomerModal").classList.remove("show");
+      $("#quickCustomerModal").setAttribute("aria-hidden", "true");
+    }
+
+    async function saveCustomerFromForm(formElement) {
+      const form = new FormData(formElement);
+      const customer = {
+        id: crypto.randomUUID(),
+        name: String(form.get("name") || "").trim(),
+        phone: String(form.get("phone") || "").trim(),
+        address: String(form.get("address") || "").trim(),
+        credit_limit: Number(form.get("credit_limit") || 0),
+        status: form.get("status") || "active",
+        lifetime_value: 0
+      };
+      if (!customer.name) {
+        toast("Customer name is required.");
+        return null;
+      }
+      try {
+        if (state.online) await db.insert("customers", customer);
+      } catch (error) {
+        console.warn(error);
+        toast("Supabase customer save failed; showing local session customer.");
+      }
+      state.data.customers.unshift(customer);
+      return customer;
+    }
+
     document.addEventListener("click", event => {
       const navButton = event.target.closest("[data-page-target]");
       if (navButton) navigate(navButton.dataset.pageTarget);
@@ -2356,10 +2420,12 @@
       }
       if (action === "recordPayment") openPaymentModal();
       if (action === "openFaultyReturn") openFaultyModal();
+      if (action === "openQuickCustomer") openQuickCustomerModal();
       if (action === "stopCamera") stopCameraScan();
       if (action === "closeProductModal") closeProductModal();
       if (action === "closePaymentModal") closePaymentModal();
       if (action === "closeFaultyModal") closeFaultyModal();
+      if (action === "closeQuickCustomer") closeQuickCustomerModal();
       if (action === "signOut") signOut();
 
       const camera = event.target.closest("[data-camera-mode]");
@@ -2386,20 +2452,22 @@
       const credit = byId(openCredits(), event.target.value);
       $("#paymentAmount").value = credit.balance || "";
     });
-    $("#customerForm").addEventListener("submit", event => {
+    $("#customerForm").addEventListener("submit", async event => {
       event.preventDefault();
-      const form = new FormData(event.currentTarget);
-      state.data.customers.unshift({
-        id: crypto.randomUUID(),
-        name: form.get("name"),
-        phone: form.get("phone"),
-        address: form.get("address"),
-        credit_limit: Number(form.get("credit_limit") || 0),
-        status: form.get("status"),
-        lifetime_value: 0
-      });
+      const customer = await saveCustomerFromForm(event.currentTarget);
+      if (!customer) return;
+      event.currentTarget.reset();
       renderAll();
-      toast("Customer saved to this session.");
+      toast("Customer saved.");
+    });
+    $("#quickCustomerForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      const customer = await saveCustomerFromForm(event.currentTarget);
+      if (!customer) return;
+      closeQuickCustomerModal();
+      renderAll();
+      $("#saleCustomer").value = customer.id;
+      toast("Customer added to checkout.");
     });
     $("#paymentForm").addEventListener("submit", async event => {
       event.preventDefault();
@@ -2441,6 +2509,7 @@
       const cost = Number(form.get("cost") || 0);
       const outcome = form.get("outcome");
       const notes = String(form.get("notes") || "").replace(/\s+/g, " ").trim();
+      const nextStock = Math.max(0, Number(product.stock_qty || 0) - qty);
       const movement = {
         id: crypto.randomUUID(),
         product_id: product.id,
@@ -2454,6 +2523,7 @@
       const activity = { id: crypto.randomUUID(), actor: state.profile?.full_name || "Cloud11 Admin", action: `Reported ${qty} faulty ${product.name}`, entity_type: "inventory_history", entity_id: movement.id, created_at: todayIso() };
       try {
         if (state.online) {
+          await db.update("products", product.id, { stock_qty: nextStock });
           await db.insert("inventory_history", movement);
           await db.insert("activity_logs", activity);
         }
@@ -2462,6 +2532,7 @@
         toast("Supabase faulty return save failed.");
         return;
       }
+      product.stock_qty = nextStock;
       state.data.inventory_history.unshift(movement);
       state.data.activity_logs.unshift(activity);
       closeFaultyModal();
